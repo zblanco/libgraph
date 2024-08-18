@@ -8,13 +8,15 @@ defmodule Graph.Edge do
   defstruct v1: nil,
             v2: nil,
             weight: 1,
-            label: nil
+            label: nil,
+            properties: %{}
 
   @type t :: %__MODULE__{
           v1: Graph.vertex(),
           v2: Graph.vertex(),
           weight: integer | float,
-          label: term
+          label: term,
+          properties: map
         }
   @type edge_opt ::
           {:weight, integer | float}
@@ -40,7 +42,8 @@ defmodule Graph.Edge do
       v1: v1,
       v2: v2,
       weight: Keyword.get(opts, :weight, 1),
-      label: Keyword.get(opts, :label)
+      label: Keyword.get(opts, :label),
+      properties: Keyword.get(opts, :properties, %{})
     }
   end
 

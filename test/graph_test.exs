@@ -20,6 +20,43 @@ defmodule GraphTest do
     assert Graph.has_vertex?(g_with_custom_vertex_identifier, :v1)
   end
 
+  describe "multigraphs" do
+    test "`multigraph: true` option enables vertex indexing on edge labels" do
+      graph =
+        Graph.new(multigraph: true)
+        |> Graph.add_edges([
+          {:a, :b},
+          {:a, :b, label: :foo},
+          {:a, :b, label: :bar},
+          {:b, :c, weight: 3},
+          {:b, :a, label: {:complex, :label}}
+        ])
+
+      assert Enum.count(Graph.out_edges(graph, :a)) == 3
+      assert [%Edge{label: :foo}] = Graph.out_edges(graph, :a, :foo)
+      assert [%Edge{label: :foo}] = Graph.in_edges(graph, :b, :foo)
+      assert [%Edge{label: :bar}] = Graph.out_edges(graph, :a, :bar)
+      assert [%Edge{label: :nil}] = Graph.out_edges(graph, :a, nil)
+      assert [] == Graph.out_edges(graph, :a, :foobar)
+    end
+
+    test "custom vertex indexing function on edge labels" do
+
+    end
+
+    test "traversal using indexed labels" do
+
+    end
+
+    test "updating edge properties" do
+
+    end
+
+    test "removing edges" do
+
+    end
+  end
+
   test "delete vertex" do
     g = Graph.new()
     g = Graph.add_vertex(g, :v1, :labelA)

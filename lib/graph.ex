@@ -28,10 +28,13 @@ defmodule Graph do
   defstruct in_edges: %{},
             out_edges: %{},
             edges: %{},
+            edge_index: %{},
             vertex_labels: %{},
             vertices: %{},
             type: :directed,
-            vertex_identifier: &Graph.Utils.vertex_id/1
+            vertex_identifier: &Graph.Utils.vertex_id/1,
+            edge_indexer: &Graph.Utils.edge_label/1,
+            multigraph: false
 
   alias Graph.{Edge, EdgeSpecificationError}
 
@@ -43,17 +46,26 @@ defmodule Graph do
   @type label :: term
   @type edge_weight :: integer | float
   @type edge_key :: {vertex_id, vertex_id}
-  @type edge_value :: %{label => edge_weight}
+  # @type edge_value :: %{label => edge_weight}
+  @type edge_index_key :: label | term
+  @type edge_properties :: %{
+          label: label,
+          weight: edge_weight
+        }
+  @type edge_value :: %{label => edge_properties()}
   @type graph_type :: :directed | :undirected
   @type vertices :: %{vertex_id => vertex}
   @type t :: %__MODULE__{
           in_edges: %{vertex_id => MapSet.t()},
           out_edges: %{vertex_id => MapSet.t()},
           edges: %{edge_key => edge_value},
+          edge_index: %{edge_index_key => MapSet.t()},
           vertex_labels: %{vertex_id => term},
           vertices: %{vertex_id => vertex},
           type: graph_type,
-          vertex_identifier: (vertex() -> term())
+          vertex_identifier: (vertex() -> term()),
+          edge_indexer: (Edge.t() -> edge_index_key),
+          multigraph: boolean()
         }
   @type graph_info :: %{
           :num_edges => non_neg_integer(),
@@ -70,6 +82,23 @@ defmodule Graph do
   - `type: :directed | :undirected`, specifies what type of graph this is. Defaults to a `:directed` graph.
   - `vertex_identifier`: a function which accepts a vertex and returns a unique identifier of said vertex.
     Defaults to `Graph.Utils.vertex_id/1`, a hash of the whole vertex utilizing `:erlang.phash2/2`.
+  - `multigraph: true | false | fn edge -> key end`, enables edge indexing by a key.
+      - When `true`, the key is the edge label itself.
+      - When `false` no additional memory is used  for sets of .
+  - `edge_indexer`: a function which accepts an `%Edge{}` and returns a unique identifier of said edge.
+    Defaults to `Graph.Utils.edge_label/1`, the edge label itself.
+
+  ### Multigraph Edge Indexing
+
+  Indexing edges trades space for time to access only edges of a kind.
+
+  When `multigraph: true` is enabled the `edge_indexer` of the graph is used to build a a set of edge keys (`{vertex_id, vertex_id}`) under a separate key.
+
+  This can be a useful trade-off when traversing a graph where many different kinds of edges exist between the same vertices and
+  you want to avoid iterating over the set of all edges. I.e. a [multigraph](https://en.wikipedia.org/wiki/Multigraph).
+  The index provides allows map access time to to a set of edges when managing the graph.
+
+  By default edges are indexed by the label but only when multigraph is toggled true.
 
   ## Example
 
@@ -91,7 +120,15 @@ defmodule Graph do
   def new(opts \\ []) do
     type = Keyword.get(opts, :type) || :directed
     vertex_identifier = Keyword.get(opts, :vertex_identifier) || (&Graph.Utils.vertex_id/1)
-    %__MODULE__{type: type, vertex_identifier: vertex_identifier}
+    edge_indexer = Keyword.get(opts, :edge_indexer) || (&Graph.Utils.edge_label/1)
+    multigraph = Keyword.get(opts, :multigraph, false)
+
+    %__MODULE__{
+      type: type,
+      vertex_identifier: vertex_identifier,
+      edge_indexer: edge_indexer,
+      multigraph: multigraph
+    }
   end
 
   @doc """
