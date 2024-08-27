@@ -6,8 +6,7 @@ defmodule Graph.Pathfinding do
 
   @type heuristic_fun :: (Graph.vertex() -> integer)
 
-  @spec bellman_ford(Graph.t(), Graph.vertex()) ::
-          %{Graph.vertex() => integer() | :infinity} | nil
+  @spec bellman_ford(Graph.t, Graph.vertex) :: %{Graph.vertex() => integer() | :infinity} | nil
   def bellman_ford(g, a), do: Graph.Pathfindings.BellmanFord.call(g, a)
 
   @doc """
