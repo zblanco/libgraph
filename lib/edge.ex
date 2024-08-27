@@ -21,6 +21,7 @@ defmodule Graph.Edge do
   @type edge_opt ::
           {:weight, integer | float}
           | {:label, term}
+          | {:properties, map}
   @type edge_opts :: [edge_opt]
 
   @doc """
@@ -38,11 +39,14 @@ defmodule Graph.Edge do
   @spec new(Graph.vertex(), Graph.vertex()) :: t
   @spec new(Graph.vertex(), Graph.vertex(), [edge_opt]) :: t | no_return
   def new(v1, v2, opts \\ []) when is_list(opts) do
+    {weight, opts} = Keyword.pop(opts, :weight, 1)
+    {label, opts} = Keyword.pop(opts, :label)
+
     %__MODULE__{
       v1: v1,
       v2: v2,
-      weight: Keyword.get(opts, :weight, 1),
-      label: Keyword.get(opts, :label),
+      weight: weight,
+      label: label,
       properties: Keyword.get(opts, :properties, %{})
     }
   end
@@ -51,12 +55,13 @@ defmodule Graph.Edge do
   def options_to_meta(opts) when is_list(opts) do
     label = Keyword.get(opts, :label)
     weight = Keyword.get(opts, :weight, 1)
+    properties = Keyword.get(opts, :properties, %{})
 
-    case {label, weight} do
-      {_, w} = meta when is_number(w) ->
-        meta
+    case {label, %{weight: weight, properties: properties}} do
+      {label, %{weight: w} = meta} when is_number(w) ->
+        {label, meta}
 
-      {_, _} ->
+      _ ->
         raise ArgumentError, message: "invalid value for :weight, must be an integer"
     end
   end

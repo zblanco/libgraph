@@ -50,7 +50,8 @@ defmodule Graph do
   @type edge_index_key :: label | term
   @type edge_properties :: %{
           label: label,
-          weight: edge_weight
+          weight: edge_weight,
+          properties: map
         }
   @type edge_value :: %{label => edge_properties()}
   @type graph_type :: :directed | :undirected
@@ -509,8 +510,12 @@ defmodule Graph do
           edge_meta when is_map(edge_meta) ->
             v2 = Map.get(vs, v2_id)
 
-            for {label, weight} <- edge_meta do
-              Edge.new(v2, v, label: label, weight: weight)
+            for {label, meta_value} <- edge_meta do
+              Edge.new(v2, v,
+                label: label,
+                weight: meta_value.weight,
+                properties: meta_value.properties
+              )
             end
         end
       end)
@@ -524,8 +529,12 @@ defmodule Graph do
           edge_meta when is_map(edge_meta) ->
             v2 = Map.get(vs, v2_id)
 
-            for {label, weight} <- edge_meta do
-              Edge.new(v, v2, label: label, weight: weight)
+            for {label, meta_value} <- edge_meta do
+              Edge.new(v2, v,
+                label: label,
+                weight: meta_value.weight,
+                properties: meta_value.properties
+              )
             end
         end
       end)
@@ -627,8 +636,8 @@ defmodule Graph do
          v2_id <- vertex_identifier.(v2),
          edge_key <- {v1_id, v2_id},
          {:ok, edge_meta} <- Map.fetch(meta, edge_key),
-         {:ok, weight} <- Map.fetch(edge_meta, label) do
-      Edge.new(v1, v2, label: label, weight: weight)
+         {:ok, %{weight: weight, properties: properties}} <- Map.fetch(edge_meta, label) do
+      Edge.new(v1, v2, label: label, weight: weight, properties: properties)
     else
       _ ->
         nil
@@ -1034,8 +1043,24 @@ defmodule Graph do
       end
 
     edge_meta = Map.get(meta, {v1_id, v2_id}, %{})
-    {label, weight} = Edge.options_to_meta(opts)
-    edge_meta = Map.put(edge_meta, label, weight)
+    {label, options_meta} = Edge.options_to_meta(opts)
+    edge_meta = Map.put(edge_meta, label, options_meta)
+
+    g =
+      if g.multigraph do
+        edge = Edge.new(v1, v2, label: label, weight: options_meta.weight, properties: opts)
+
+        partition = g.edge_indexer.(edge)
+        key = {v1_id, partition}
+        set = Map.get(g.edge_index, key, MapSet.new())
+
+        %__MODULE__{
+          g
+          | edge_index: Map.put(g.edge_index, key, MapSet.put(set, {v1_id, v2_id}))
+        }
+      else
+        g
+      end
 
     %__MODULE__{
       g
@@ -1050,7 +1075,7 @@ defmodule Graph do
   in a few different ways to make it easy to generate graphs succinctly.
 
   Edges must be provided as a list of `Edge` structs, `{vertex, vertex}` pairs, or
-  `{vertex, vertex, edge_opts :: [label: term, weight: integer]}`.
+  `{vertex, vertex, edge_opts :: [label: term, weight: integer, properties: map]}`.
 
   See the docs for `Graph.Edge.new/2` or `Graph.Edge.new/3` for more info on creating Edge structs, and
   `add_edge/3` for information on edge options.
@@ -2242,14 +2267,49 @@ defmodule Graph do
       Enum.flat_map(v_out, fn v2_id ->
         v2 = Map.get(vs, v2_id)
 
-        Enum.map(Map.get(meta, {v_id, v2_id}), fn {label, weight} ->
-          Edge.new(v, v2, label: label, weight: weight)
+        Enum.map(Map.get(meta, {v_id, v2_id}), fn {label, edge_meta} ->
+          Edge.new(v, v2,
+            label: label,
+            weight: edge_meta.weight,
+            properties: edge_meta.properties
+          )
         end)
       end)
     else
       _ ->
         []
     end
+  end
+
+  def out_edges(
+        %__MODULE__{
+          vertices: vs,
+          edges: edges,
+          multigraph: true,
+          edge_index: edge_index,
+          vertex_identifier: vertex_identifier,
+          edge_indexer: edge_indexer
+        },
+        v,
+        partition
+      ) do
+    v1_id = vertex_identifier.(v)
+    key = {v1_id, partition}
+    # only return out_edges for which the index key returns a subset
+    edge_index
+    |> Map.get(key, MapSet.new())
+    |> Enum.flat_map(fn {_v1_id, v2_id} = edge_key ->
+      v2 = Map.get(vs, v2_id)
+
+      edges
+      |> Map.get(edge_key, [])
+      |> Enum.map(fn {label, edge_meta} ->
+        Edge.new(v, v2, label: label, weight: edge_meta.weight, properties: edge_meta.properties)
+      end)
+      |> Enum.filter(fn edge ->
+        edge_indexer.(edge) == partition
+      end)
+    end)
   end
 
   @doc """
