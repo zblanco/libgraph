@@ -31,29 +31,39 @@ defmodule GraphTest do
           {:b, :c, weight: 3},
           {:b, :a, label: {:complex, :label}}
         ])
+        |> IO.inspect(structs: false)
 
       assert Enum.count(Graph.out_edges(graph, :a)) == 3
       assert [%Edge{label: :foo}] = Graph.out_edges(graph, :a, :foo)
       assert [%Edge{label: :foo}] = Graph.in_edges(graph, :b, :foo)
       assert [%Edge{label: :bar}] = Graph.out_edges(graph, :a, :bar)
-      assert [%Edge{label: :nil}] = Graph.out_edges(graph, :a, nil)
+      assert [%Edge{label: nil}] = Graph.out_edges(graph, :a, nil)
       assert [] == Graph.out_edges(graph, :a, :foobar)
     end
 
-    test "custom vertex indexing function on edge labels" do
+    test "custom edge indexing function" do
+      graph =
+        Graph.new(multigraph: true, edge_indexer: fn edge -> edge.weight end)
+        |> Graph.add_edges([
+          {:a, :b},
+          {:a, :b, label: :foo},
+          {:a, :b, label: :bar},
+          {:b, :c, weight: 3},
+          {:b, :a, weight: 6}
+        ])
 
+      assert Enum.count(Graph.out_edges(graph, :b)) == 2
+      assert [%Edge{weight: 6}] = Graph.out_edges(graph, :b, 6)
+      assert [%Edge{weight: 6}] = Graph.out_edges(graph, :b, 3)
     end
 
-    test "traversal using indexed labels" do
-
+    test "traversal using indexed keys" do
     end
 
-    test "updating edge properties" do
-
+    test "edge properties" do
     end
 
     test "removing edges" do
-
     end
   end
 
@@ -673,7 +683,7 @@ defmodule GraphTest do
   end
 
   defp build_complex_signed_graph do
-    Graph.new
+    Graph.new()
     |> Graph.add_edge(:a, :b, weight: -1)
     |> Graph.add_edge(:b, :e, weight: 2)
     |> Graph.add_edge(:e, :d, weight: -3)
