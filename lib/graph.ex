@@ -33,7 +33,7 @@ defmodule Graph do
             vertices: %{},
             type: :directed,
             vertex_identifier: &Graph.Utils.vertex_id/1,
-            edge_indexer: &Graph.Utils.edge_label/1,
+            partition_by: &Graph.Utils.edge_label/1,
             multigraph: false
 
   alias Graph.{Edge, EdgeSpecificationError}
@@ -65,7 +65,7 @@ defmodule Graph do
           vertices: %{vertex_id => vertex},
           type: graph_type,
           vertex_identifier: (vertex() -> term()),
-          edge_indexer: (Edge.t() -> edge_index_key),
+          partition_by: (Edge.t() -> edge_index_key),
           multigraph: boolean()
         }
   @type graph_info :: %{
@@ -121,13 +121,13 @@ defmodule Graph do
   def new(opts \\ []) do
     type = Keyword.get(opts, :type) || :directed
     vertex_identifier = Keyword.get(opts, :vertex_identifier) || (&Graph.Utils.vertex_id/1)
-    edge_indexer = Keyword.get(opts, :edge_indexer) || (&Graph.Utils.edge_label/1)
+    partition_by = Keyword.get(opts, :partition_by) || (&Graph.Utils.edge_label/1)
     multigraph = Keyword.get(opts, :multigraph, false)
 
     %__MODULE__{
       type: type,
       vertex_identifier: vertex_identifier,
-      edge_indexer: edge_indexer,
+      partition_by: partition_by,
       multigraph: multigraph
     }
   end
@@ -550,12 +550,12 @@ defmodule Graph do
       iex> g = Graph.new |> Graph.add_edge(:a, :b, label: :uses)
       ...> g = Graph.add_edge(g, :a, :b, label: :contains)
       ...> Graph.edges(g, :a, :b)
-      [%Graph.Edge{v1: :a, v2: :b, label: :contains}, %Graph.Edge{v1: :a, v2: :b, label: :uses}]
+      [%Graph.Edge{v1: :a, v2: :b, label: :uses}, %Graph.Edge{v1: :a, v2: :b, label: :contains}]
 
       iex> g = Graph.new(type: :undirected) |> Graph.add_edge(:a, :b, label: :uses)
       ...> g = Graph.add_edge(g, :a, :b, label: :contains)
       ...> Graph.edges(g, :a, :b)
-      [%Graph.Edge{label: :contains, properties: %{}, v1: :a, v2: :b, weight: 1}, %Graph.Edge{v1: :a, v2: :b, weight: 1, label: :uses, properties: %{}}]
+      [%Graph.Edge{v1: :a, v2: :b, weight: 1, label: :uses, properties: %{}}, %Graph.Edge{label: :contains, properties: %{}, v1: :a, v2: :b, weight: 1}]
   """
   @spec edges(t, vertex, vertex) :: [Edge.t()]
   def edges(%__MODULE__{type: type, edges: meta, vertex_identifier: vertex_identifier}, v1, v2) do
@@ -1050,13 +1050,18 @@ defmodule Graph do
       if g.multigraph do
         edge = Edge.new(v1, v2, label: label, weight: options_meta.weight, properties: opts)
 
-        partition = g.edge_indexer.(edge)
-        key = {v1_id, partition}
-        set = Map.get(g.edge_index, key, MapSet.new())
+        partition = g.partition_by.(edge)
+        v1_key = {v1_id, partition}
+        v2_key = {v2_id, partition}
+        v1_set = Map.get(g.edge_index, v1_key, MapSet.new())
+        v2_set = Map.get(g.edge_index, v2_key, MapSet.new())
 
         %__MODULE__{
           g
-          | edge_index: Map.put(g.edge_index, key, MapSet.put(set, {v1_id, v2_id}))
+          | edge_index:
+              g.edge_index
+              |> Map.put(v1_key, MapSet.put(v1_set, {v1_id, v2_id}))
+              |> Map.put(v2_key, MapSet.put(v2_set, {v1_id, v2_id}))
         }
       else
         g
@@ -1092,7 +1097,7 @@ defmodule Graph do
 
       iex> g = Graph.new |> Graph.add_edges([{:a, :b}, {:a, :b, label: :foo}, {:a, :b, label: :foo, weight: 2}])
       ...> Graph.edges(g)
-      [%Graph.Edge{v1: :a, v2: :b, label: :foo, weight: 2}, %Graph.Edge{v1: :a, v2: :b}]
+      [%Graph.Edge{v1: :a, v2: :b, weight: 1, label: nil, properties: %{}}, %Graph.Edge{label: :foo, properties: %{}, v1: :a, v2: :b, weight: 2}]
 
       iex> Graph.new |> Graph.add_vertices([:a, :b, :c]) |> Graph.add_edges([:a, :b])
       ** (Graph.EdgeSpecificationError) Expected a valid edge specification, but got: :a
@@ -1190,7 +1195,7 @@ defmodule Graph do
       iex> g = Graph.new |> Graph.add_edge(:a, :b) |> Graph.add_edge(:a, :b, label: :bar)
       ...> %Graph{} = g = Graph.update_edge(g, :a, :b, weight: 2, label: :foo)
       ...> Graph.edges(g)
-      [%Graph.Edge{v1: :a, v2: :b, label: :bar}, %Graph.Edge{v1: :a, v2: :b, label: :foo, weight: 2}]
+      [%Graph.Edge{v1: :a, v2: :b, label: :foo, weight: 2}, %Graph.Edge{v1: :a, v2: :b, label: :bar}]
   """
   @spec update_edge(t, vertex, vertex, Edge.edge_opts()) :: t | {:error, :no_such_edge}
   def update_edge(%__MODULE__{} = g, v1, v2, opts) when is_list(opts) do
@@ -1207,12 +1212,12 @@ defmodule Graph do
       iex> g = Graph.new |> Graph.add_edge(:a, :b) |> Graph.add_edge(:a, :b, label: :bar)
       ...> %Graph{} = g = Graph.update_labelled_edge(g, :a, :b, :bar, weight: 2, label: :foo)
       ...> Graph.edges(g)
-      [%Graph.Edge{v1: :a, v2: :b, label: :foo, weight: 2}, %Graph.Edge{v1: :a, v2: :b}]
+      [%Graph.Edge{v1: :a, v2: :b, weight: 1, label: nil, properties: %{}}, %Graph.Edge{label: :foo, properties: %{}, v1: :a, v2: :b, weight: 2}]
 
       iex> g = Graph.new(type: :undirected) |> Graph.add_edge(:a, :b) |> Graph.add_edge(:a, :b, label: :bar)
       ...> %Graph{} = g = Graph.update_labelled_edge(g, :a, :b, :bar, weight: 2, label: :foo)
       ...> Graph.edges(g)
-      [%Graph.Edge{v1: :a, v2: :b, label: :foo, weight: 2}, %Graph.Edge{v1: :a, v2: :b}]
+      [%Graph.Edge{v1: :a, v2: :b, weight: 1, label: nil, properties: %{}}, %Graph.Edge{label: :foo, properties: %{}, v1: :a, v2: :b, weight: 2}]
   """
   @spec update_labelled_edge(t, vertex, vertex, label, Edge.edge_opts()) ::
           t | {:error, :no_such_edge}
@@ -2179,7 +2184,7 @@ defmodule Graph do
 
       iex> g = Graph.new |> Graph.add_edges([{:a, :b}, {:a, :b, label: :foo}, {:b, :c}])
       ...> Graph.in_edges(g, :b)
-      [%Graph.Edge{v1: :a, v2: :b, label: :foo}, %Graph.Edge{v1: :a, v2: :b}]
+      [%Graph.Edge{v1: :a, v2: :b, weight: 1, label: nil, properties: %{}}, %Graph.Edge{label: :foo, properties: %{}, v1: :a, v2: :b, weight: 1}]
   """
   @spec in_edges(t, vertex) :: Edge.t()
   def in_edges(%__MODULE__{type: :undirected} = g, v) do
@@ -2211,6 +2216,38 @@ defmodule Graph do
     else
       _ -> []
     end
+  end
+
+  def in_edges(
+        %__MODULE__{
+          vertices: vs,
+          edges: edges,
+          multigraph: true,
+          vertex_identifier: vertex_identifier,
+          edge_index: edge_index,
+          partition_by: partition_by
+        },
+        v,
+        partition
+      ) do
+    v2_id = vertex_identifier.(v)
+    key = {v2_id, partition}
+
+    edge_index
+    |> Map.get(key, MapSet.new())
+    |> IO.inspect(label: "edge_index_keys")
+    |> Enum.flat_map(fn {v1_id, _v2_id} = edge_key ->
+      v1 = Map.get(vs, v1_id)
+
+      edges
+      |> Map.get(edge_key, [])
+      |> Enum.map(fn {label, edge_meta} ->
+        Edge.new(v1, v, label: label, weight: edge_meta.weight, properties: edge_meta.properties)
+      end)
+      |> Enum.filter(fn edge ->
+        partition_by.(edge) == partition
+      end)
+    end)
   end
 
   @doc """
@@ -2250,7 +2287,7 @@ defmodule Graph do
 
       iex> g = Graph.new |> Graph.add_edges([{:a, :b}, {:a, :b, label: :foo}, {:b, :c}])
       ...> Graph.out_edges(g, :a)
-      [%Graph.Edge{v1: :a, v2: :b, label: :foo, properties: %{}}, %Graph.Edge{v1: :a, v2: :b}]
+      [%Graph.Edge{v1: :a, v2: :b, weight: 1, label: nil, properties: %{}}, %Graph.Edge{label: :foo, properties: %{}, v1: :a, v2: :b, weight: 1}]
   """
   @spec out_edges(t, vertex) :: Edge.t()
   def out_edges(%__MODULE__{type: :undirected} = g, v) do
@@ -2292,7 +2329,7 @@ defmodule Graph do
           multigraph: true,
           edge_index: edge_index,
           vertex_identifier: vertex_identifier,
-          edge_indexer: edge_indexer
+          partition_by: partition_by
         },
         v,
         partition
@@ -2311,7 +2348,7 @@ defmodule Graph do
         Edge.new(v, v2, label: label, weight: edge_meta.weight, properties: edge_meta.properties)
       end)
       |> Enum.filter(fn edge ->
-        edge_indexer.(edge) == partition
+        partition_by.(edge) == partition
       end)
     end)
   end

@@ -38,8 +38,8 @@ defmodule Graph.Serializers.Flowchart do
         g.edges
         |> Map.fetch!({id, out_edge_id})
         |> Enum.map(fn
-          {nil, weight} -> {id, out_edge_id, weight}
-          {label, weight} -> {id, out_edge_id, weight, encode_label(label)}
+          {nil, %{weight: weight}} -> {id, out_edge_id, weight}
+          {label, %{weight: weight}} -> {id, out_edge_id, weight, encode_label(label)}
         end)
       end)
       |> case do

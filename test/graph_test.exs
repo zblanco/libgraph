@@ -21,7 +21,7 @@ defmodule GraphTest do
   end
 
   describe "multigraphs" do
-    test "`multigraph: true` option enables vertex indexing on edge labels" do
+    test "`multigraph: true` option enables edge indexing on edge labels" do
       graph =
         Graph.new(multigraph: true)
         |> Graph.add_edges([
@@ -43,7 +43,7 @@ defmodule GraphTest do
 
     test "custom edge indexing function" do
       graph =
-        Graph.new(multigraph: true, edge_indexer: fn edge -> edge.weight end)
+        Graph.new(multigraph: true, partition_by: fn edge -> edge.weight end)
         |> Graph.add_edges([
           {:a, :b},
           {:a, :b, label: :foo},
@@ -54,7 +54,7 @@ defmodule GraphTest do
 
       assert Enum.count(Graph.out_edges(graph, :b)) == 2
       assert [%Edge{weight: 6}] = Graph.out_edges(graph, :b, 6)
-      assert [%Edge{weight: 6}] = Graph.out_edges(graph, :b, 3)
+      assert [%Edge{weight: 3}] = Graph.out_edges(graph, :b, 3)
     end
 
     test "traversal using indexed keys" do
@@ -123,12 +123,12 @@ defmodule GraphTest do
     # pretty printed
     str = "#{inspect(g)}"
 
-    assert "#Graph<type: directed, vertices: [:a, :b, :c], edges: [:a -[foo]-> :b, :a -> :b, :b -[{:complex, :label}]-> :a, :b -> :c]>" =
+    assert "#Graph<type: directed, vertices: [:a, :b, :c], edges: [:a -> :b, :a -[foo]-> :b, :b -[{:complex, :label}]-> :a, :b -> :c]>" =
              str
 
     ustr = "#{inspect(ug)}"
 
-    assert "#Graph<type: undirected, vertices: [:a, :b, :c], edges: [:a <-[foo]-> :b, :a <-> :b, :a <-[{:complex, :label}]-> :b, :b <-> :c]>" =
+    assert "#Graph<type: undirected, vertices: [:a, :b, :c], edges: [:a <-> :b, :a <-[foo]-> :b, :a <-[{:complex, :label}]-> :b, :b <-> :c]>" =
              ustr
 
     # large graph

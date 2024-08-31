@@ -28,10 +28,10 @@ defmodule Graph.Serializers.DOT do
           |> Map.get(id, MapSet.new())
           |> Enum.flat_map(fn id2 ->
             Enum.map(Map.fetch!(em, {id, id2}), fn
-              {nil, weight} ->
+              {nil, %{weight: weight}} ->
                 {id, id2, weight}
 
-              {label, weight} ->
+              {label, %{weight: weight}} ->
                 {id, id2, weight, Serializer.encode_label(label)}
             end)
           end)
