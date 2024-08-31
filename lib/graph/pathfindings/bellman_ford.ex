@@ -51,7 +51,8 @@ defmodule Graph.Pathfindings.BellmanFord do
   end
 
   @spec edge_weight(term) :: float
-  defp edge_weight({e, edge_value}), do: {e, edge_value |> Map.values() |> List.first()}
+  defp edge_weight({e, edge_value}),
+    do: {e, edge_value |> Map.values() |> List.first() |> Map.get(:weight)}
 
   defp has_negative_cycle?(distances, meta) do
     Enum.any?(meta, fn {{u, v}, weight} ->

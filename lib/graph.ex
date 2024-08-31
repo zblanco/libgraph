@@ -465,8 +465,8 @@ defmodule Graph do
         target = Map.get(vs, out_neighbor)
         meta = Map.get(meta, {source_id, out_neighbor})
 
-        Enum.map(meta, fn {label, weight} ->
-          Edge.new(source, target, label: label, weight: weight)
+        Enum.map(meta, fn {label, %{weight: weight, properties: properties}} ->
+          Edge.new(source, target, label: label, weight: weight, properties: properties)
         end)
       end)
     end)
@@ -555,7 +555,7 @@ defmodule Graph do
       iex> g = Graph.new(type: :undirected) |> Graph.add_edge(:a, :b, label: :uses)
       ...> g = Graph.add_edge(g, :a, :b, label: :contains)
       ...> Graph.edges(g, :a, :b)
-      [%Graph.Edge{v1: :a, v2: :b, label: :contains}, %Graph.Edge{v1: :a, v2: :b, label: :uses}]
+      [%Graph.Edge{label: :contains, properties: %{}, v1: :a, v2: :b, weight: 1}, %Graph.Edge{v1: :a, v2: :b, weight: 1, label: :uses, properties: %{}}]
   """
   @spec edges(t, vertex, vertex) :: [Edge.t()]
   def edges(%__MODULE__{type: type, edges: meta, vertex_identifier: vertex_identifier}, v1, v2) do
@@ -577,18 +577,18 @@ defmodule Graph do
   end
 
   defp edge_list(v1, v2, edge_meta, :undirected) do
-    for {label, weight} <- edge_meta do
+    for {label, %{weight: weight, properties: properties}} <- edge_meta do
       if v1 > v2 do
-        Edge.new(v2, v1, label: label, weight: weight)
+        Edge.new(v2, v1, label: label, weight: weight, properties: properties)
       else
-        Edge.new(v1, v2, label: label, weight: weight)
+        Edge.new(v1, v2, label: label, weight: weight, properties: properties)
       end
     end
   end
 
   defp edge_list(v1, v2, edge_meta, _) do
-    for {label, weight} <- edge_meta do
-      Edge.new(v1, v2, label: label, weight: weight)
+    for {label, %{weight: weight, properties: properties}} <- edge_meta do
+      Edge.new(v1, v2, label: label, weight: weight, properties: properties)
     end
   end
 
@@ -1169,10 +1169,10 @@ defmodule Graph do
 
       g = add_vertex(g, v3)
 
-      Enum.reduce(meta, g, fn {label, weight}, acc ->
+      Enum.reduce(meta, g, fn {label, %{weight: weight, properties: properties}}, acc ->
         acc
-        |> add_edge(v1, v3, label: label, weight: weight)
-        |> add_edge(v3, v2, label: label, weight: weight)
+        |> add_edge(v1, v3, label: label, weight: weight, properties: properties)
+        |> add_edge(v3, v2, label: label, weight: weight, properties: properties)
       end)
     else
       _ -> {:error, :no_such_edge}
@@ -1241,18 +1241,18 @@ defmodule Graph do
          edge_key <- {v1_id, v2_id},
          {:ok, meta} <- Map.fetch(em, edge_key),
          {:ok, _} <- Map.fetch(meta, old_label),
-         {new_label, new_weight} <- Edge.options_to_meta(opts) do
+         {new_label, new_attrs} <- Edge.options_to_meta(opts) do
       case new_label do
         ^old_label ->
-          new_meta = Map.put(meta, old_label, new_weight)
+          new_meta = Map.put(meta, old_label, new_attrs)
           %__MODULE__{g | edges: Map.put(em, edge_key, new_meta)}
 
         nil ->
-          new_meta = Map.put(meta, old_label, new_weight)
+          new_meta = Map.put(meta, old_label, new_attrs)
           %__MODULE__{g | edges: Map.put(em, edge_key, new_meta)}
 
         _ ->
-          new_meta = Map.put(Map.delete(meta, old_label), new_label, new_weight)
+          new_meta = Map.put(Map.delete(meta, old_label), new_label, new_attrs)
           %__MODULE__{g | edges: Map.put(em, edge_key, new_meta)}
       end
     else
@@ -2200,8 +2200,12 @@ defmodule Graph do
       Enum.flat_map(v_in, fn v1_id ->
         v1 = Map.get(vs, v1_id)
 
-        Enum.map(Map.get(meta, {v1_id, v_id}), fn {label, weight} ->
-          Edge.new(v1, v, label: label, weight: weight)
+        Enum.map(Map.get(meta, {v1_id, v_id}), fn {label, edge_meta} ->
+          Edge.new(v1, v,
+            label: label,
+            weight: edge_meta.weight,
+            properties: edge_meta.properties
+          )
         end)
       end)
     else
@@ -2246,7 +2250,7 @@ defmodule Graph do
 
       iex> g = Graph.new |> Graph.add_edges([{:a, :b}, {:a, :b, label: :foo}, {:b, :c}])
       ...> Graph.out_edges(g, :a)
-      [%Graph.Edge{v1: :a, v2: :b, label: :foo}, %Graph.Edge{v1: :a, v2: :b}]
+      [%Graph.Edge{v1: :a, v2: :b, label: :foo, properties: %{}}, %Graph.Edge{v1: :a, v2: :b}]
   """
   @spec out_edges(t, vertex) :: Edge.t()
   def out_edges(%__MODULE__{type: :undirected} = g, v) do
@@ -2348,8 +2352,12 @@ defmodule Graph do
       |> Enum.reduce(sg, fn v2_id, sg ->
         v2 = Map.get(vertices, v2_id)
 
-        Enum.reduce(Map.get(meta, {v_id, v2_id}), sg, fn {label, weight}, sg ->
-          Graph.add_edge(sg, v, v2, label: label, weight: weight)
+        Enum.reduce(Map.get(meta, {v_id, v2_id}), sg, fn {label, edge_meta}, sg ->
+          Graph.add_edge(sg, v, v2,
+            label: label,
+            weight: edge_meta.weight,
+            properties: edge_meta.properties
+          )
         end)
       end)
     end)

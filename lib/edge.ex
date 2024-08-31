@@ -61,7 +61,8 @@ defmodule Graph.Edge do
       {label, %{weight: w} = meta} when is_number(w) ->
         {label, meta}
 
-      _ ->
+      other ->
+        IO.inspect(other)
         raise ArgumentError, message: "invalid value for :weight, must be an integer"
     end
   end
