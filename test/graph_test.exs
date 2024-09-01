@@ -31,7 +31,7 @@ defmodule GraphTest do
           {:b, :c, weight: 3},
           {:b, :a, label: {:complex, :label}}
         ])
-        |> IO.inspect(structs: false)
+        |> IO.inspect(structs: false, label: "multigraph")
 
       assert Enum.count(Graph.out_edges(graph, :a)) == 3
       assert [%Edge{label: :foo}] = Graph.out_edges(graph, :a, :foo)
@@ -41,7 +41,7 @@ defmodule GraphTest do
       assert [] == Graph.out_edges(graph, :a, :foobar)
     end
 
-    test "custom edge indexing function" do
+    test "custom edge partition_by function" do
       graph =
         Graph.new(multigraph: true, partition_by: fn edge -> edge.weight end)
         |> Graph.add_edges([
@@ -57,13 +57,54 @@ defmodule GraphTest do
       assert [%Edge{weight: 3}] = Graph.out_edges(graph, :b, 3)
     end
 
+    test "removing edges prunes index" do
+      g =
+        Graph.new(multigraph: true)
+        |> Graph.add_edges([
+          {:a, :b},
+          {:a, :b, label: :foo},
+          {:a, :b, label: :bar},
+          {:b, :c, weight: 3},
+          {:b, :a, label: {:complex, :label}}
+        ])
+
+      g = Graph.delete_edges(g, [{:b, :c}, {:b, :a}])
+      refute Map.has_key?(g.edge_index, {g.vertex_identifier.(:b), {:complex, :label}})
+    end
+
     test "traversal using indexed keys" do
     end
+  end
 
-    test "edge properties" do
+  describe "edge properties" do
+    test "setting edge properties" do
+      g =
+        Graph.new()
+        |> Graph.add_edges([
+          {:a, :b, properties: %{foo: :bar}},
+          {:a, :b, label: :foo, properties: %{bar: :foo}}
+        ])
+
+      assert [
+               %Edge{v1: :a, v2: :b, properties: %{foo: :bar}},
+               %Edge{v1: :a, v2: :b, label: :foo, properties: %{bar: :foo}}
+             ] = Graph.out_edges(g, :a)
     end
 
-    test "removing edges" do
+    test "updating edge properties" do
+      g =
+        Graph.new()
+        |> Graph.add_edges([
+          {:a, :b, properties: %{foo: :bar}},
+          {:a, :b, label: :foo, properties: %{bar: :foo}}
+        ])
+        |> Graph.update_edge(:a, :b, properties: %{ham: :potato})
+        |> Graph.update_labelled_edge(:a, :b, :foo, properties: %{potato: :ham})
+
+      assert [
+               %Edge{v1: :a, v2: :b, properties: %{ham: :potato}},
+               %Edge{v1: :a, v2: :b, label: :foo, properties: %{potato: :ham}}
+             ] = Graph.out_edges(g, :a)
     end
   end
 

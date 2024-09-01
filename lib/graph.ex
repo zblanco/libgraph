@@ -86,20 +86,18 @@ defmodule Graph do
   - `multigraph: true | false | fn edge -> key end`, enables edge indexing by a key.
       - When `true`, the key is the edge label itself.
       - When `false` no additional memory is used  for sets of .
-  - `edge_indexer`: a function which accepts an `%Edge{}` and returns a unique identifier of said edge.
-    Defaults to `Graph.Utils.edge_label/1`, the edge label itself.
+  - `partition_by`: a function which accepts an `%Edge{}` and returns a unique identifier of said edge.
+    Defaults to `Graph.Utils.edge_label/1`, the edge label itself when multigraphs are enabled.
 
   ### Multigraph Edge Indexing
 
   Indexing edges trades space for time to access only edges of a kind.
 
-  When `multigraph: true` is enabled the `edge_indexer` of the graph is used to build a a set of edge keys (`{vertex_id, vertex_id}`) under a separate key.
+  When `multigraph: true` is enabled the `partition_by` of the graph is used to build a set of edge keys (`{vertex_id, vertex_id}`) under a separate key.
 
   This can be a useful trade-off when traversing a graph where many different kinds of edges exist between the same vertices and
   you want to avoid iterating over the set of all edges. I.e. a [multigraph](https://en.wikipedia.org/wiki/Multigraph).
   The index provides allows map access time to to a set of edges when managing the graph.
-
-  By default edges are indexed by the label but only when multigraph is toggled true.
 
   ## Example
 
@@ -1308,6 +1306,8 @@ defmodule Graph do
          v1,
          v2
        ) do
+    g = prune_edge_index(g, v1, v2, nil)
+
     with v1_id <- vertex_identifier.(v1),
          v2_id <- vertex_identifier.(v2),
          edge_key <- {v1_id, v2_id},
@@ -1326,6 +1326,50 @@ defmodule Graph do
     else
       _ -> g
     end
+  end
+
+  defp prune_edge_index(
+         %__MODULE__{
+           multigraph: true,
+           edge_index: edge_index,
+           edges: meta,
+           partition_by: partition_by,
+           vertex_identifier: vertex_identifier
+         } = g,
+         v1,
+         v2,
+         label
+       ) do
+    v1_id = vertex_identifier.(v1)
+    v2_id = vertex_identifier.(v2)
+
+    {_label, edge_meta} =
+      meta
+      |> Map.get({v1_id, v2_id})
+      |> Enum.filter(fn {edge_label, _} -> edge_label == label end)
+      |> List.first()
+
+    edge =
+      Edge.new(v1, v2, label: label, weight: edge_meta.weight, properties: edge_meta.properties)
+
+    edge_p = partition_by.(edge)
+
+    v1_key = {v1_id, edge_p}
+    v2_key = {v2_id, edge_p}
+
+    edge_index =
+      edge_index
+      |> Map.delete(v1_key)
+      |> Map.delete(v2_key)
+
+    %__MODULE__{
+      g
+      | edge_index: edge_index
+    }
+  end
+
+  defp prune_edge_index(%__MODULE__{multigraph: false} = g, _v1, _v2, _label) do
+    g
   end
 
   @doc """
@@ -1379,6 +1423,8 @@ defmodule Graph do
          v2,
          label
        ) do
+    g = prune_edge_index(g, v1, v2, label)
+
     with v1_id <- vertex_identifier.(v1),
          v2_id <- vertex_identifier.(v2),
          edge_key <- {v1_id, v2_id},
@@ -2235,7 +2281,6 @@ defmodule Graph do
 
     edge_index
     |> Map.get(key, MapSet.new())
-    |> IO.inspect(label: "edge_index_keys")
     |> Enum.flat_map(fn {v1_id, _v2_id} = edge_key ->
       v1 = Map.get(vs, v1_id)
 
