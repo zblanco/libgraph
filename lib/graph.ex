@@ -1306,13 +1306,12 @@ defmodule Graph do
          v1,
          v2
        ) do
-    g = prune_edge_index(g, v1, v2, nil)
-
     with v1_id <- vertex_identifier.(v1),
          v2_id <- vertex_identifier.(v2),
          edge_key <- {v1_id, v2_id},
          {:ok, v1_out} <- Map.fetch(oe, v1_id),
          {:ok, v2_in} <- Map.fetch(ie, v2_id) do
+      g = prune_edge_index(g, {v1_id, v1}, {v2_id, v2}, nil)
       v1_out = MapSet.delete(v1_out, v2_id)
       v2_in = MapSet.delete(v2_in, v1_id)
       meta = Map.delete(meta, edge_key)
@@ -1333,21 +1332,52 @@ defmodule Graph do
            multigraph: true,
            edge_index: edge_index,
            edges: meta,
-           partition_by: partition_by,
-           vertex_identifier: vertex_identifier
+           partition_by: partition_by
          } = g,
-         v1,
-         v2,
+         {v1_id, v1},
+         {v2_id, v2},
+         nil
+       ) do
+    meta
+    |> Map.get({v1_id, v2_id})
+    |> Enum.reduce(g, fn {label, edge_meta}, acc ->
+      edge =
+        Edge.new(v1, v2, label: label, weight: edge_meta.weight, properties: edge_meta.properties)
+
+      edge_p = partition_by.(edge)
+
+      v1_key = {v1_id, edge_p}
+      v2_key = {v2_id, edge_p}
+
+      edge_index =
+        edge_index
+        |> Map.delete(v1_key)
+        |> Map.delete(v2_key)
+
+      %__MODULE__{
+        acc
+        | edge_index: edge_index
+      }
+    end)
+  end
+
+  defp prune_edge_index(
+         %__MODULE__{
+           multigraph: true,
+           edge_index: edge_index,
+           edges: meta,
+           partition_by: partition_by
+         } = g,
+         {v1_id, v1},
+         {v2_id, v2},
          label
        ) do
-    v1_id = vertex_identifier.(v1)
-    v2_id = vertex_identifier.(v2)
-
-    {_label, edge_meta} =
+    [{_label, edge_meta} | _] =
       meta
       |> Map.get({v1_id, v2_id})
-      |> Enum.filter(fn {edge_label, _} -> edge_label == label end)
-      |> List.first()
+      |> Enum.filter(fn {edge_label, _v} ->
+        edge_label == label
+      end)
 
     edge =
       Edge.new(v1, v2, label: label, weight: edge_meta.weight, properties: edge_meta.properties)
@@ -1423,8 +1453,6 @@ defmodule Graph do
          v2,
          label
        ) do
-    g = prune_edge_index(g, v1, v2, label)
-
     with v1_id <- vertex_identifier.(v1),
          v2_id <- vertex_identifier.(v2),
          edge_key <- {v1_id, v2_id},
@@ -1432,6 +1460,7 @@ defmodule Graph do
          {:ok, v2_in} <- Map.fetch(ie, v2_id),
          {:ok, edge_meta} <- Map.fetch(meta, edge_key),
          {:ok, _} <- Map.fetch(edge_meta, label) do
+      g = prune_edge_index(g, {v1_id, v1}, {v2_id, v2}, label)
       edge_meta = Map.delete(edge_meta, label)
 
       case map_size(edge_meta) do

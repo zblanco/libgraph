@@ -31,7 +31,6 @@ defmodule GraphTest do
           {:b, :c, weight: 3},
           {:b, :a, label: {:complex, :label}}
         ])
-        |> IO.inspect(structs: false, label: "multigraph")
 
       assert Enum.count(Graph.out_edges(graph, :a)) == 3
       assert [%Edge{label: :foo}] = Graph.out_edges(graph, :a, :foo)
@@ -70,6 +69,22 @@ defmodule GraphTest do
 
       g = Graph.delete_edges(g, [{:b, :c}, {:b, :a}])
       refute Map.has_key?(g.edge_index, {g.vertex_identifier.(:b), {:complex, :label}})
+    end
+
+    test "delete_edge/3 removes only a multigraph's properties and index for the given partition key" do
+      g =
+        Graph.new(multigraph: true)
+        |> Graph.add_edges([
+          {:a, :b},
+          {:a, :b, label: :foo},
+          {:a, :b, label: :bar},
+          {:b, :c, weight: 3},
+          {:b, :a, label: {:complex, :label}}
+        ])
+
+      g = Graph.delete_edge(g, :a, :b, :foo) |> IO.inspect(structs: false)
+      refute Map.has_key?(g.edge_index, {g.vertex_identifier.(:a), :foo})
+      refute Map.has_key?(g.edge_index, {g.vertex_identifier.(:b), :foo})
     end
 
     test "traversal using indexed keys" do
