@@ -33,16 +33,38 @@ defmodule GraphTest do
         ])
 
       assert Enum.count(Graph.out_edges(graph, :a)) == 3
-      assert [%Edge{label: :foo}] = Graph.out_edges(graph, :a, :foo)
-      assert [%Edge{label: :foo}] = Graph.in_edges(graph, :b, :foo)
-      assert [%Edge{label: :bar}] = Graph.out_edges(graph, :a, :bar)
-      assert [%Edge{label: nil}] = Graph.out_edges(graph, :a, nil)
-      assert [] == Graph.out_edges(graph, :a, :foobar)
+      assert [%Edge{label: :foo}] = Graph.out_edges(graph, :a, by: [:foo])
+      assert [%Edge{label: :foo}] = Graph.out_edges(graph, :a, by: :foo)
+      assert [%Edge{label: :foo}] = Graph.in_edges(graph, :b, by: :foo)
+      assert [%Edge{label: :bar}] = Graph.out_edges(graph, :a, by: :bar)
+      assert [%Edge{label: nil}] = Graph.out_edges(graph, :a, by: nil)
+
+      assert [%Edge{label: nil}] = Graph.out_edges(graph, :a, by: nil)
+
+      assert [%Edge{label: {:complex, :label}}] =
+               Graph.out_edges(graph, :b,
+                 where: fn edge -> edge.label == {:complex, :label} or edge.label == :bar end
+               )
+
+      assert 1 == graph |> Graph.edges(by: :foo) |> Enum.count()
+      assert 1 == graph |> Graph.edges(where: fn edge -> edge.weight > 2 end) |> Enum.count()
+
+      assert 2 ==
+               graph
+               |> Graph.edges(by: [:foo, :bar])
+               |> Enum.count()
+
+      assert 1 ==
+               graph
+               |> Graph.edges(by: [:foo, :bar], where: fn edge -> edge.label == :bar end)
+               |> Enum.count()
+
+      assert [] == Graph.out_edges(graph, :a, by: :foobar)
     end
 
     test "custom edge partition_by function" do
       graph =
-        Graph.new(multigraph: true, partition_by: fn edge -> edge.weight end)
+        Graph.new(multigraph: true, partition_where: fn edge -> edge.weight end)
         |> Graph.add_edges([
           {:a, :b},
           {:a, :b, label: :foo},
@@ -52,8 +74,8 @@ defmodule GraphTest do
         ])
 
       assert Enum.count(Graph.out_edges(graph, :b)) == 2
-      assert [%Edge{weight: 6}] = Graph.out_edges(graph, :b, 6)
-      assert [%Edge{weight: 3}] = Graph.out_edges(graph, :b, 3)
+      assert [%Edge{weight: 6}] = Graph.out_edges(graph, :b, where: 6)
+      assert [%Edge{weight: 3}] = Graph.out_edges(graph, :b, where: 3)
     end
 
     test "removing edges prunes index" do
@@ -71,7 +93,7 @@ defmodule GraphTest do
       refute Map.has_key?(g.edge_index, {g.vertex_identifier.(:b), {:complex, :label}})
     end
 
-    test "delete_edge/3 removes only a multigraph's properties and index for the given partition key" do
+    test "delete_edge/3 removes only a multigraph's properties and index for the given partition key/label" do
       g =
         Graph.new(multigraph: true)
         |> Graph.add_edges([
@@ -82,7 +104,7 @@ defmodule GraphTest do
           {:b, :a, label: {:complex, :label}}
         ])
 
-      g = Graph.delete_edge(g, :a, :b, :foo) |> IO.inspect(structs: false)
+      g = Graph.delete_edge(g, :a, :b, :foo)
       refute Map.has_key?(g.edge_index, {g.vertex_identifier.(:a), :foo})
       refute Map.has_key?(g.edge_index, {g.vertex_identifier.(:b), :foo})
     end

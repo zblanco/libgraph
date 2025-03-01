@@ -483,7 +483,21 @@ defmodule Graph do
       ...> Graph.edges(g, :d)
       []
   """
-  @spec edges(t, vertex) :: [Edge.t()]
+  @spec edges(t, vertex | keyword()) :: [Edge.t()]
+
+  def edges(%__MODULE__{multigraph: true} = g, opts) when is_list(opts) do
+    where_fun = opts[:where]
+
+    if Keyword.has_key?(opts, :by) do
+      partitions = partition_for_opts(opts[:by])
+      edges_in_partitions(g, partitions, where_fun)
+    else
+      g
+      |> edges()
+      |> filter_edges(where_fun)
+    end
+  end
+
   def edges(
         %__MODULE__{
           in_edges: ie,
@@ -555,7 +569,25 @@ defmodule Graph do
       ...> Graph.edges(g, :a, :b)
       [%Graph.Edge{v1: :a, v2: :b, weight: 1, label: :uses, properties: %{}}, %Graph.Edge{label: :contains, properties: %{}, v1: :a, v2: :b, weight: 1}]
   """
-  @spec edges(t, vertex, vertex) :: [Edge.t()]
+  @spec edges(t, vertex, vertex | keyword()) :: [Edge.t()]
+  def edges(
+        %__MODULE__{multigraph: true} = g,
+        v1,
+        opts
+      )
+      when is_list(opts) do
+    where_fun = opts[:where]
+
+    if Keyword.has_key?(opts, :by) do
+      partitions = partition_for_opts(opts[:by])
+      edges_in_partitions(g, v1, partitions, where_fun)
+    else
+      g
+      |> edges(v1)
+      |> filter_edges(where_fun)
+    end
+  end
+
   def edges(%__MODULE__{type: type, edges: meta, vertex_identifier: vertex_identifier}, v1, v2) do
     with v1_id <- vertex_identifier.(v1),
          v2_id <- vertex_identifier.(v2),
@@ -572,6 +604,100 @@ defmodule Graph do
           edge_list(v1, v2, merged_meta, type)
       end
     end
+  end
+
+  defp edges_in_partitions(g, partitions, where_fun) do
+    partitions
+    |> Enum.reduce(MapSet.new(), fn partition, acc ->
+      g.edge_index
+      |> Map.get(partition, %{})
+      |> Map.values()
+      |> Enum.reduce(acc, fn partitioned_set, pacc ->
+        MapSet.union(partitioned_set, pacc)
+      end)
+    end)
+    |> Enum.flat_map(fn {v1_id, v2_id} = edge_key ->
+      v1 = Map.get(g.vertices, v1_id)
+      v2 = Map.get(g.vertices, v2_id)
+
+      g.edges
+      |> Map.get(edge_key, [])
+      |> Enum.reduce([], fn {label, edge_meta}, acc ->
+        edge =
+          Edge.new(v1, v2,
+            label: label,
+            weight: edge_meta.weight,
+            properties: edge_meta.properties
+          )
+
+        edge_partition = g.partition_by.(edge)
+
+        if include_edge_for_filtered_partitions?(edge, edge_partition, partitions, where_fun) do
+          [edge | acc]
+        else
+          acc
+        end
+      end)
+    end)
+  end
+
+  defp edges_in_partitions(g, v1, partitions, where_fun) do
+    v1_id = g.vertex_identifier.(v1)
+
+    out_edges_set =
+      g.out_edges
+      |> Map.get(v1_id, MapSet.new())
+      |> MapSet.new(fn v2_id ->
+        {v1_id, v2_id}
+      end)
+
+    in_edges_set =
+      g.in_edges
+      |> Map.get(v1_id, MapSet.new())
+      |> MapSet.new(fn v2_id ->
+        {v2_id, v1_id}
+      end)
+
+    edges = MapSet.union(out_edges_set, in_edges_set)
+
+    edge_adjacency_set =
+      partitions
+      |> Enum.reduce(MapSet.new(), fn partition, acc ->
+        g.edge_index
+        |> Map.get(partition, %{})
+        |> Map.get(v1_id, MapSet.new())
+        |> MapSet.union(acc)
+      end)
+      |> MapSet.intersection(edges)
+
+    Enum.flat_map(edge_adjacency_set, fn {_v1_id, v2_id} = edge_key ->
+      v2 = Map.get(g.verticies, v2_id)
+
+      edges
+      |> Map.get(edge_key, [])
+      |> Enum.reduce([], fn {label, edge_meta}, acc ->
+        edge =
+          Edge.new(v1, v2,
+            label: label,
+            weight: edge_meta.weight,
+            properties: edge_meta.properties
+          )
+
+        edge_partition = g.partition_by.(edge)
+
+        if include_edge_for_filtered_partitions?(edge, edge_partition, partitions, where_fun) do
+          [edge | acc]
+        else
+          acc
+        end
+      end)
+    end)
+  end
+
+  defp filter_edges(edges, nil), do: edges
+
+  defp filter_edges(edges, where_fun) do
+    Enum.filter(edges, where_fun)
   end
 
   defp edge_list(v1, v2, edge_meta, :undirected) do
@@ -1049,17 +1175,28 @@ defmodule Graph do
         edge = Edge.new(v1, v2, label: label, weight: options_meta.weight, properties: opts)
 
         partition = g.partition_by.(edge)
-        v1_key = {v1_id, partition}
-        v2_key = {v2_id, partition}
-        v1_set = Map.get(g.edge_index, v1_key, MapSet.new())
-        v2_set = Map.get(g.edge_index, v2_key, MapSet.new())
+
+        edge_partition = Map.get(g.edge_index, partition, %{})
+
+        v1_set = Map.get(edge_partition, v1_id, MapSet.new())
+        v2_set = Map.get(edge_partition, v2_id, MapSet.new())
+
+        new_edge_partition =
+          edge_partition
+          |> Map.put(
+            v1_id,
+            MapSet.put(v1_set, {v1_id, v2_id})
+          )
+          |> Map.put(
+            v2_id,
+            MapSet.put(v2_set, {v1_id, v2_id})
+          )
 
         %__MODULE__{
           g
           | edge_index:
               g.edge_index
-              |> Map.put(v1_key, MapSet.put(v1_set, {v1_id, v2_id}))
-              |> Map.put(v2_key, MapSet.put(v2_set, {v1_id, v2_id}))
+              |> Map.put(partition, new_edge_partition)
         }
       else
         g
@@ -2297,30 +2434,52 @@ defmodule Graph do
         %__MODULE__{
           vertices: vs,
           edges: edges,
+          in_edges: ie,
           multigraph: true,
           vertex_identifier: vertex_identifier,
           edge_index: edge_index,
           partition_by: partition_by
         },
         v,
-        partition
+        by: partition
       ) do
     v2_id = vertex_identifier.(v)
-    key = {v2_id, partition}
 
-    edge_index
-    |> Map.get(key, MapSet.new())
-    |> Enum.flat_map(fn {v1_id, _v2_id} = edge_key ->
+    in_edges_set =
+      ie
+      |> Map.get(v2_id, MapSet.new())
+      |> MapSet.new(fn v1_id ->
+        {v1_id, v2_id}
+      end)
+
+    in_edge_adjacency_set =
+      edge_index
+      |> Map.get(partition, %{})
+      |> Map.get(v2_id, MapSet.new())
+      |> MapSet.intersection(in_edges_set)
+
+    Enum.flat_map(in_edge_adjacency_set, fn {v1_id, _v2_id} = edge_key ->
       v1 = Map.get(vs, v1_id)
 
       edges
       |> Map.get(edge_key, [])
       |> Enum.map(fn {label, edge_meta} ->
-        Edge.new(v1, v, label: label, weight: edge_meta.weight, properties: edge_meta.properties)
+        edge =
+          Edge.new(v1, v,
+            label: label,
+            weight: edge_meta.weight,
+            properties: edge_meta.properties
+          )
+
+        edge_partition = partition_by.(edge)
+
+        if edge_partition == partition do
+          edge
+        else
+          nil
+        end
       end)
-      |> Enum.filter(fn edge ->
-        partition_by.(edge) == partition
-      end)
+      |> Enum.reject(&is_nil/1)
     end)
   end
 
@@ -2396,35 +2555,99 @@ defmodule Graph do
     end
   end
 
-  def out_edges(
-        %__MODULE__{
-          vertices: vs,
-          edges: edges,
-          multigraph: true,
-          edge_index: edge_index,
-          vertex_identifier: vertex_identifier,
-          partition_by: partition_by
-        },
-        v,
-        partition
-      ) do
+  @spec out_edges(Graph.t(), any(), [{:by, any()}, ...]) :: list()
+  def out_edges(%__MODULE__{multigraph: true} = g, v, opts)
+      when is_list(opts) do
+    where_fun = opts[:where]
+
+    if Keyword.has_key?(opts, :by) do
+      partitions = partition_for_opts(opts[:by])
+
+      out_edges_in_partitions(g, v, partitions, where_fun)
+    else
+      g
+      |> out_edges(v)
+      |> filter_edges(where_fun)
+    end
+  end
+
+  defp partition_for_opts(partition) when is_list(partition) do
+    partition
+  end
+
+  defp partition_for_opts(partition) do
+    [partition]
+  end
+
+  defp out_edges_in_partitions(
+         %__MODULE__{
+           vertices: vs,
+           edges: edges,
+           out_edges: oe,
+           multigraph: true,
+           edge_index: edge_index,
+           vertex_identifier: vertex_identifier,
+           partition_by: partition_by
+         },
+         v,
+         partitions,
+         where_fun
+       ) do
     v1_id = vertex_identifier.(v)
-    key = {v1_id, partition}
-    # only return out_edges for which the index key returns a subset
-    edge_index
-    |> Map.get(key, MapSet.new())
-    |> Enum.flat_map(fn {_v1_id, v2_id} = edge_key ->
+
+    out_edges_set =
+      oe
+      |> Map.get(v1_id, MapSet.new())
+      |> MapSet.new(fn v2_id ->
+        {v1_id, v2_id}
+      end)
+
+    out_edge_adjacency_set =
+      partitions
+      |> Enum.reduce(MapSet.new(), fn partition, acc ->
+        edge_index
+        |> Map.get(partition, %{})
+        |> Map.get(v1_id, MapSet.new())
+        |> MapSet.union(acc)
+      end)
+      |> MapSet.intersection(out_edges_set)
+
+    Enum.flat_map(out_edge_adjacency_set, fn {_v1_id, v2_id} = edge_key ->
       v2 = Map.get(vs, v2_id)
 
       edges
       |> Map.get(edge_key, [])
-      |> Enum.map(fn {label, edge_meta} ->
-        Edge.new(v, v2, label: label, weight: edge_meta.weight, properties: edge_meta.properties)
-      end)
-      |> Enum.filter(fn edge ->
-        partition_by.(edge) == partition
+      |> Enum.reduce([], fn {label, edge_meta}, acc ->
+        edge =
+          Edge.new(v, v2,
+            label: label,
+            weight: edge_meta.weight,
+            properties: edge_meta.properties
+          )
+
+        edge_partition = partition_by.(edge)
+
+        if include_edge_for_filtered_partitions?(edge, edge_partition, partitions, where_fun) do
+          [edge | acc]
+        else
+          acc
+        end
       end)
     end)
+  end
+
+  defp include_edge_for_filtered_partitions?(_edge, edge_partition, partitions, nil = _where_fun) do
+    edge_partition in partitions
+  end
+
+  defp include_edge_for_filtered_partitions?(edge, edge_partition, partitions, where_fun)
+       when is_function(where_fun) do
+    edge_partition in partitions and where_fun.(edge)
+  end
+
+  defp include_edge_for_filtered_partitions?(edge, _edge_partition, _partitions, where_fun)
+       when is_function(where_fun) do
+    where_fun.(edge)
   end
 
   @doc """
