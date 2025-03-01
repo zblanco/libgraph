@@ -64,7 +64,7 @@ defmodule GraphTest do
 
     test "custom edge partition_by function" do
       graph =
-        Graph.new(multigraph: true, partition_where: fn edge -> edge.weight end)
+        Graph.new(multigraph: true, partition_by: fn edge -> edge.weight end)
         |> Graph.add_edges([
           {:a, :b},
           {:a, :b, label: :foo},
