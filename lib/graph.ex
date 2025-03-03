@@ -91,13 +91,11 @@ defmodule Graph do
 
   ### Multigraph Edge Indexing
 
-  Indexing edges trades space for time to access only edges of a kind.
+  When `multigraph: true` is enabled the `partition_by` function maintains sets of edges for the partition.
+  This option enables a space for time trade-off for Map access retrieval partitioned edges of a kind i.e. [multigraph](https://en.wikipedia.org/wiki/Multigraph) capabilities.
 
-  When `multigraph: true` is enabled the `partition_by` of the graph is used to build a set of edge keys (`{vertex_id, vertex_id}`) under a separate key.
-
-  This can be a useful trade-off when traversing a graph where many different kinds of edges exist between the same vertices and
-  you want to avoid iterating over the set of all edges. I.e. a [multigraph](https://en.wikipedia.org/wiki/Multigraph).
-  The index provides allows map access time to to a set of edges when managing the graph.
+  This edge adjacency index can be useful for graphs where many different kinds of edges exist between the same vertices and
+  iteration over all edges is prohibitive.
 
   ## Example
 
@@ -471,7 +469,12 @@ defmodule Graph do
   end
 
   @doc """
-  Returns a list of all edges inbound or outbound from vertex `v`.
+  Returns a list of all edges inbound or outbound from vertex `v` or by multigraph traversal options.
+
+  ## Options when `multigraph: true`
+
+  - `:where` - a function that accepts an edge and must return a boolean to include the edge.
+  - `:by` - a keyword list of partitions to traverse. If not provided, all edges are traversed.
 
   ## Example
 
@@ -482,6 +485,16 @@ defmodule Graph do
       iex> g = Graph.new |> Graph.add_edges([{:a, :b}, {:b, :c}])
       ...> Graph.edges(g, :d)
       []
+
+      iex> g = Graph.new(multigraph: true) |> Graph.add_edges([{:a, :b}, {:b, :c}])
+      ...> g = Graph.add_edge(g, :a, :b, label: :contains)
+      ...> Graph.edges(g, :a, by: [:contains])
+      [%Graph.Edge{v1: :a, v2: :b, label: :contains}]
+
+      iex> g = Graph.new(multigraph: true) |> Graph.add_edges([{:a, :b}, {:b, :c}])
+      ...> g = Graph.add_edge(g, :a, :b, label: :contains, weight: 2)
+      ...> Graph.edges(g, :a, where: fn edge -> edge.weight == 2 end)
+      [%Graph.Edge{v1: :a, v2: :b, label: :contains, weight: 2}]
   """
   @spec edges(t, vertex | keyword()) :: [Edge.t()]
 
@@ -555,7 +568,12 @@ defmodule Graph do
   end
 
   @doc """
-  Returns a list of all edges between `v1` and `v2`.
+  Returns a list of all edges between `v1` and `v2` or connected to `v1` given multigraph options.
+
+  ## Options when `multigraph: true`
+
+  - `:where` - a function that accepts an edge and must return a boolean to include the edge.
+  - `:by` - a single partition or list of partitions to traverse. If not provided, all edges are traversed.
 
   ## Example
 
@@ -568,6 +586,16 @@ defmodule Graph do
       ...> g = Graph.add_edge(g, :a, :b, label: :contains)
       ...> Graph.edges(g, :a, :b)
       [%Graph.Edge{v1: :a, v2: :b, weight: 1, label: :uses, properties: %{}}, %Graph.Edge{label: :contains, properties: %{}, v1: :a, v2: :b, weight: 1}]
+
+      iex> g = Graph.new(multigraph: true) |> Graph.add_edges([{:a, :b}, {:b, :c}])
+      ...> g = Graph.add_edge(g, :a, :b, label: :contains)
+      ...> Graph.edges(g, :a, by: :contains)
+      [%Graph.Edge{v1: :a, v2: :b, label: :contains}]
+
+      iex> g = Graph.new(multigraph: true) |> Graph.add_edges([{:a, :b}, {:b, :c}])
+      ...> g = Graph.add_edge(g, :a, :b, label: :contains, weight: 2)
+      ...> Graph.edges(g, :a, by: :contains, where: fn edge -> edge.weight == 2 end)
+      [%Graph.Edge{v1: :a, v2: :b, label: :contains, weight: 2}]
   """
   @spec edges(t, vertex, vertex | keyword()) :: [Edge.t()]
   def edges(
@@ -671,9 +699,9 @@ defmodule Graph do
       |> MapSet.intersection(edges)
 
     Enum.flat_map(edge_adjacency_set, fn {_v1_id, v2_id} = edge_key ->
-      v2 = Map.get(g.verticies, v2_id)
+      v2 = Map.get(g.vertices, v2_id)
 
-      edges
+      g.edges
       |> Map.get(edge_key, [])
       |> Enum.reduce([], fn {label, edge_meta}, acc ->
         edge =

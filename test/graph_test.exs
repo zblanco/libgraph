@@ -49,6 +49,11 @@ defmodule GraphTest do
       assert 1 == graph |> Graph.edges(by: :foo) |> Enum.count()
       assert 1 == graph |> Graph.edges(where: fn edge -> edge.weight > 2 end) |> Enum.count()
 
+      assert 1 ==
+               graph
+               |> Graph.edges(:a, by: :foo)
+               |> Enum.count()
+
       assert 2 ==
                graph
                |> Graph.edges(by: [:foo, :bar])
@@ -74,8 +79,12 @@ defmodule GraphTest do
         ])
 
       assert Enum.count(Graph.out_edges(graph, :b)) == 2
-      assert [%Edge{weight: 6}] = Graph.out_edges(graph, :b, where: fn edge -> edge.weight == 6 end)
-      assert [%Edge{weight: 3}] = Graph.out_edges(graph, :b, where: fn edge -> edge.weight == 3 end)
+
+      assert [%Edge{weight: 6}] =
+               Graph.out_edges(graph, :b, where: fn edge -> edge.weight == 6 end)
+
+      assert [%Edge{weight: 3}] =
+               Graph.out_edges(graph, :b, where: fn edge -> edge.weight == 3 end)
     end
 
     test "removing edges prunes index" do
