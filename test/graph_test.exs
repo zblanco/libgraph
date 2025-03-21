@@ -114,8 +114,27 @@ defmodule GraphTest do
         ])
 
       g = Graph.delete_edge(g, :a, :b, :foo)
-      refute Map.has_key?(g.edge_index, {g.vertex_identifier.(:a), :foo})
-      refute Map.has_key?(g.edge_index, {g.vertex_identifier.(:b), :foo})
+
+      refute Map.has_key?(g.edge_index, :foo)
+      assert Enum.empty?(Graph.out_edges(g, :a, by: :foo))
+      assert Enum.empty?(Graph.edges(g, by: :foo))
+    end
+
+    test "update_labelled_edge/3 updates an indexed adge with new label" do
+      g =
+        Graph.new(multigraph: true)
+        |> Graph.add_edges([
+          {:a, :b},
+          {:a, :b, label: :foo},
+          {:a, :b, label: :bar},
+          {:b, :c, weight: 3},
+          {:b, :a, label: {:complex, :label}}
+        ])
+
+      g = Graph.update_labelled_edge(g, :a, :b, :foo, label: :baz)
+
+      refute Map.has_key?(g.edge_index, :foo)
+      assert Map.has_key?(g.edge_index[:baz], g.vertex_identifier.(:a))
     end
 
     test "traversal using indexed keys" do

@@ -1202,30 +1202,7 @@ defmodule Graph do
       if g.multigraph do
         edge = Edge.new(v1, v2, label: label, weight: options_meta.weight, properties: opts)
 
-        partition = g.partition_by.(edge)
-
-        edge_partition = Map.get(g.edge_index, partition, %{})
-
-        v1_set = Map.get(edge_partition, v1_id, MapSet.new())
-        v2_set = Map.get(edge_partition, v2_id, MapSet.new())
-
-        new_edge_partition =
-          edge_partition
-          |> Map.put(
-            v1_id,
-            MapSet.put(v1_set, {v1_id, v2_id})
-          )
-          |> Map.put(
-            v2_id,
-            MapSet.put(v2_set, {v1_id, v2_id})
-          )
-
-        %__MODULE__{
-          g
-          | edge_index:
-              g.edge_index
-              |> Map.put(partition, new_edge_partition)
-        }
+        index_multigraph_edge(g, {v1_id, v2_id}, edge)
       else
         g
       end
@@ -1235,6 +1212,37 @@ defmodule Graph do
       | in_edges: Map.put(ie, v2_id, in_neighbors),
         out_edges: Map.put(oe, v1_id, out_neighbors),
         edges: Map.put(meta, {v1_id, v2_id}, edge_meta)
+    }
+  end
+
+  defp index_multigraph_edge(
+         %__MODULE__{multigraph: true, edge_index: edge_index} = g,
+         {v1_id, v2_id},
+         %Edge{} = edge
+       ) do
+    partition = g.partition_by.(edge)
+
+    edge_partition = Map.get(edge_index, partition, %{})
+
+    v1_set = Map.get(edge_partition, v1_id, MapSet.new())
+    v2_set = Map.get(edge_partition, v2_id, MapSet.new())
+
+    new_edge_partition =
+      edge_partition
+      |> Map.put(
+        v1_id,
+        MapSet.put(v1_set, {v1_id, v2_id})
+      )
+      |> Map.put(
+        v2_id,
+        MapSet.put(v2_set, {v1_id, v2_id})
+      )
+
+    %__MODULE__{
+      g
+      | edge_index:
+          edge_index
+          |> Map.put(partition, new_edge_partition)
     }
   end
 
@@ -1421,7 +1429,20 @@ defmodule Graph do
 
         _ ->
           new_meta = Map.put(Map.delete(meta, old_label), new_label, new_attrs)
-          %__MODULE__{g | edges: Map.put(em, edge_key, new_meta)}
+
+          if g.multigraph do
+            g =
+              g
+              |> prune_edge_index({v1_id, v1}, {v2_id, v2}, old_label)
+              |> index_multigraph_edge(
+                {v1_id, v2_id},
+                Edge.new(v1, v2, label: new_label, weight: new_attrs.weight, properties: opts)
+              )
+
+            %__MODULE__{g | edges: Map.put(em, edge_key, new_meta)}
+          else
+            %__MODULE__{g | edges: Map.put(em, edge_key, new_meta)}
+          end
       end
     else
       _ ->
@@ -1549,13 +1570,20 @@ defmodule Graph do
 
     edge_p = partition_by.(edge)
 
-    v1_key = {v1_id, edge_p}
-    v2_key = {v2_id, edge_p}
+    partition =
+      edge_index
+      |> Map.get(edge_p, %{})
+      |> Map.reject(fn {k, v} ->
+        (k == v1_id and MapSet.member?(v, {v1_id, v2_id})) or
+          (k == v2_id and MapSet.member?(v, {v1_id, v2_id}))
+      end)
 
     edge_index =
-      edge_index
-      |> Map.delete(v1_key)
-      |> Map.delete(v2_key)
+      if not Enum.empty?(partition) do
+        Map.put(edge_index, edge_p, partition)
+      else
+        Map.delete(edge_index, edge_p)
+      end
 
     %__MODULE__{
       g
