@@ -111,5 +111,5 @@ defmodule Graph.Utils do
   @max_phash 4_294_967_296
   def vertex_id(v), do: :erlang.phash2(v, @max_phash)
 
-  def edge_label(%{label: label}), do: label
+  def by_edge_label(%{label: label}), do: [label]
 end

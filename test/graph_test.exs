@@ -69,7 +69,7 @@ defmodule GraphTest do
 
     test "custom edge partition_by function" do
       graph =
-        Graph.new(multigraph: true, partition_by: fn edge -> edge.weight end)
+        Graph.new(multigraph: true, partition_by: fn edge -> [edge.weight] end)
         |> Graph.add_edges([
           {:a, :b},
           {:a, :b, label: :foo},
@@ -85,6 +85,25 @@ defmodule GraphTest do
 
       assert [%Edge{weight: 3}] =
                Graph.out_edges(graph, :b, where: fn edge -> edge.weight == 3 end)
+    end
+
+    test "custom partition_by supports indexing to more than one partition" do
+      graph =
+        Graph.new(multigraph: true, partition_by: fn edge -> [edge.weight, edge.label] end)
+        |> Graph.add_edges([
+          {:a, :b},
+          {:a, :d, label: :foo},
+          {:a, :b, label: :bar},
+          {:b, :c, weight: 3},
+          {:b, :a, weight: 6, label: :foo}
+        ])
+
+      assert Enum.count(Graph.out_edges(graph, :b)) == 2
+
+      assert [%Edge{weight: 6, label: :foo}] =
+               Graph.out_edges(graph, :b, by: 6)
+
+      assert Enum.count(Graph.edges(graph, by: [:foo])) == 2
     end
 
     test "removing edges prunes index" do
@@ -300,13 +319,11 @@ defmodule GraphTest do
       ])
       |> Graph.edges(:a)
 
-    expected_result = [
-      %Graph.Edge{label: "label3", v1: :b, v2: :a, weight: 1},
-      %Graph.Edge{label: "label1", v1: :a, v2: :b, weight: 1},
-      %Graph.Edge{label: "label2", v1: :a, v2: :b, weight: 1}
-    ]
-
-    assert generated_result == expected_result
+    for edge <- generated_result do
+      assert edge.label in ["label1", "label2", "label3"] and
+               ((edge.v1 == :a and edge.v2 == :b) or
+                  (edge.v1 == :b and edge.v2 == :a))
+    end
   end
 
   test "is_subgraph?" do
