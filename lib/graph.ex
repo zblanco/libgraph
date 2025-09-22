@@ -1139,8 +1139,14 @@ defmodule Graph do
       [%Graph.Edge{v1: :a, v2: :b}]
   """
   @spec add_edge(t, Edge.t()) :: t
-  def add_edge(%__MODULE__{} = g, %Edge{v1: v1, v2: v2, label: label, weight: weight}) do
-    add_edge(g, v1, v2, label: label, weight: weight)
+  def add_edge(%__MODULE__{} = g, %Edge{
+        v1: v1,
+        v2: v2,
+        label: label,
+        weight: weight,
+        properties: properties
+      }) do
+    add_edge(g, v1, v2, label: label, weight: weight, properties: properties)
   end
 
   @doc """

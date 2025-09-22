@@ -156,8 +156,30 @@ defmodule GraphTest do
       assert Map.has_key?(g.edge_index[:baz], g.vertex_identifier.(:a))
     end
 
-    test "traversal using indexed keys" do
-    end
+    # test "BFS traversal using multigraph partitions" do
+    #   graph =
+    #     Graph.new(multigraph: true)
+    #     |> Graph.add_edges([
+    #       {:a, :b, label: :foo},
+    #       {:a, :b, label: :bar},
+    #       {:b, :c, weight: 3},
+    #       {:b, :a, label: {:complex, :label}}
+    #     ])
+
+    #   assert Graph.bfs(graph, :a) == [:a, :b, :c]
+    # end
+
+    # test "DFS traversal using multigraph partitions" do
+    # end
+
+    # test "Dijkstra traversal using multigraph partitions" do
+    # end
+
+    # test "A* traversal using multigraph partitions" do
+    # end
+
+    # test "Bellman-Ford traversal using multigraph partitions" do
+    # end
   end
 
   describe "edge properties" do
@@ -188,6 +210,19 @@ defmodule GraphTest do
       assert [
                %Edge{v1: :a, v2: :b, properties: %{ham: :potato}},
                %Edge{v1: :a, v2: :b, label: :foo, properties: %{potato: :ham}}
+             ] = Graph.out_edges(g, :a)
+    end
+
+    test "adding edge struct with properties" do
+      g =
+        Graph.new()
+
+      edge = Edge.new(:a, :b, properties: %{foo: :bar})
+
+      g = Graph.add_edge(g, edge)
+
+      assert [
+               %Edge{v1: :a, v2: :b, properties: %{foo: :bar}}
              ] = Graph.out_edges(g, :a)
     end
   end
