@@ -31,7 +31,9 @@ defimpl Inspect, for: Graph do
           out_v = Map.get(vs, out_id)
           out_v_doc = Inspect.Algebra.to_doc(out_v, opts)
 
-          Enum.map(Map.fetch!(meta, {v_id, out_id}), fn
+          Map.fetch!(meta, {v_id, out_id})
+          |> Enum.sort()
+          |> Enum.map(fn
             {nil, _} when type == :directed ->
               [v, " -> ", out_v_doc]
 

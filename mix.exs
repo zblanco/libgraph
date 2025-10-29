@@ -49,7 +49,7 @@ defmodule Graph.Mixfile do
   defp deps do
     [
       {:benchee, "~> 1.0", only: [:bench]},
-      {:stream_data, "~> 0.5", only: [:test]},
+      {:stream_data, "~> 1.0", only: [:test]},
       {:excoveralls, "~> 0.7", only: [:test]},
       {:dialyxir, "~> 1.0", only: [:dev], runtime: false},
       {:ex_doc, ">= 0.0.0", only: :dev},

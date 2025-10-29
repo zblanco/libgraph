@@ -425,9 +425,11 @@ defmodule Graph do
       out_neighbors
       |> Enum.flat_map(fn out_neighbor ->
         target = Map.get(vs, out_neighbor)
-        meta = Map.get(meta, {source_id, out_neighbor})
+        edge_meta = Map.get(meta, {source_id, out_neighbor})
 
-        Enum.map(meta, fn {label, weight} ->
+        edge_meta
+        |> Enum.sort()
+        |> Enum.map(fn {label, weight} ->
           Edge.new(source, target, label: label, weight: weight)
         end)
       end)
@@ -531,19 +533,23 @@ defmodule Graph do
   end
 
   defp edge_list(v1, v2, edge_meta, :undirected) do
-    for {label, weight} <- edge_meta do
+    edge_meta
+    |> Enum.sort()
+    |> Enum.map(fn {label, weight} ->
       if v1 > v2 do
         Edge.new(v2, v1, label: label, weight: weight)
       else
         Edge.new(v1, v2, label: label, weight: weight)
       end
-    end
+    end)
   end
 
   defp edge_list(v1, v2, edge_meta, _) do
-    for {label, weight} <- edge_meta do
+    edge_meta
+    |> Enum.sort()
+    |> Enum.map(fn {label, weight} ->
       Edge.new(v1, v2, label: label, weight: weight)
-    end
+    end)
   end
 
   @doc """
@@ -2138,7 +2144,9 @@ defmodule Graph do
       Enum.flat_map(v_in, fn v1_id ->
         v1 = Map.get(vs, v1_id)
 
-        Enum.map(Map.get(meta, {v1_id, v_id}), fn {label, weight} ->
+        Map.get(meta, {v1_id, v_id})
+        |> Enum.sort()
+        |> Enum.map(fn {label, weight} ->
           Edge.new(v1, v, label: label, weight: weight)
         end)
       end)
@@ -2205,7 +2213,9 @@ defmodule Graph do
       Enum.flat_map(v_out, fn v2_id ->
         v2 = Map.get(vs, v2_id)
 
-        Enum.map(Map.get(meta, {v_id, v2_id}), fn {label, weight} ->
+        Map.get(meta, {v_id, v2_id})
+        |> Enum.sort()
+        |> Enum.map(fn {label, weight} ->
           Edge.new(v, v2, label: label, weight: weight)
         end)
       end)

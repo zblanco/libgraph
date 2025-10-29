@@ -636,7 +636,7 @@ defmodule GraphTest do
   end
 
   defp build_complex_signed_graph do
-    Graph.new
+    Graph.new()
     |> Graph.add_edge(:a, :b, weight: -1)
     |> Graph.add_edge(:b, :e, weight: 2)
     |> Graph.add_edge(:e, :d, weight: -3)
