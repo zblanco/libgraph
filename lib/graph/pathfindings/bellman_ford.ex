@@ -50,14 +50,24 @@ defmodule Graph.Pathfindings.BellmanFord do
     Enum.map(meta, &edge_weight/1)
   end
 
-  defp edges_with_weights(meta, %Graph{partition_by: partition_by}, partitions) do
+  defp edges_with_weights(
+         meta,
+         %Graph{partition_by: partition_by, edge_properties: ep},
+         partitions
+       ) do
     Enum.flat_map(meta, fn {edge_key, edge_value} ->
       edge_value
-      |> Enum.filter(fn {label, %{weight: weight, properties: properties}} ->
-        eps = partition_by.(%{label: label, weight: weight, properties: properties})
+      |> Enum.filter(fn {label, weight} ->
+        props =
+          case ep do
+            %{^edge_key => %{^label => p}} -> p
+            _ -> %{}
+          end
+
+        eps = partition_by.(%{label: label, weight: weight, properties: props})
         Enum.any?(eps, fn ep -> ep in partitions end)
       end)
-      |> Enum.map(fn {_label, %{weight: weight}} ->
+      |> Enum.map(fn {_label, weight} ->
         {edge_key, weight}
       end)
     end)
@@ -84,7 +94,7 @@ defmodule Graph.Pathfindings.BellmanFord do
 
   @spec edge_weight(term) :: float
   defp edge_weight({e, edge_value}),
-    do: {e, edge_value |> Map.values() |> List.first() |> Map.get(:weight)}
+    do: {e, edge_value |> Map.values() |> List.first()}
 
   defp has_negative_cycle?(distances, meta) do
     Enum.any?(meta, fn {{u, v}, weight} ->

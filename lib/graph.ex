@@ -16,9 +16,9 @@ defmodule Graph do
   - A map of vertex ids to their in neighbors (`in_edges`), effectively the transposition of `out_edges`
   - A map of vertex ids to vertex labels (`vertex_labels`), (labels are only stored if a non-nil label was provided)
   - A map of edge ids (where an edge id is simply a tuple of `{vertex_id, vertex_id}`) to a map of edge metadata (`edges`)
-  - Edge metadata is a map of `label => %{weight: weight, properties: properties}`, and each entry in that map
-    represents a distinct edge. This allows us to support multiple edges in the same direction between the same
-    pair of vertices, but for many purposes simply treat them as a single logical edge.
+  - Edge metadata is a map of `label => weight`, and each entry in that map represents a distinct edge. This allows
+    us to support multiple edges in the same direction between the same pair of vertices, but for many purposes simply
+    treat them as a single logical edge.
 
   This structure is designed to be as efficient as possible once a graph is built, but it turned out that it is also
   quite efficient for manipulating the graph as well. For example, splitting an edge and introducing a new vertex on that
@@ -48,6 +48,7 @@ defmodule Graph do
             out_edges: %{},
             edges: %{},
             edge_index: %{},
+            edge_properties: %{},
             vertex_labels: %{},
             vertices: %{},
             type: :directed,
@@ -65,14 +66,8 @@ defmodule Graph do
   @type label :: term
   @type edge_weight :: integer | float
   @type edge_key :: {vertex_id, vertex_id}
-  # @type edge_value :: %{label => edge_weight}
+  @type edge_value :: %{label => edge_weight}
   @type edge_index_key :: label | term
-  @type edge_properties :: %{
-          label: label,
-          weight: edge_weight,
-          properties: map
-        }
-  @type edge_value :: %{label => edge_properties()}
   @type graph_type :: :directed | :undirected
   @type vertices :: %{vertex_id => vertex}
   @type t :: %__MODULE__{
@@ -538,7 +533,7 @@ defmodule Graph do
 
   """
   @spec edges(t) :: [Edge.t()]
-  def edges(%__MODULE__{out_edges: edges, edges: meta, vertices: vs}) do
+  def edges(%__MODULE__{out_edges: edges, edges: meta, vertices: vs, edge_properties: ep}) do
     edges
     |> Enum.flat_map(fn {source_id, out_neighbors} ->
       source = Map.get(vs, source_id)
@@ -546,10 +541,12 @@ defmodule Graph do
       out_neighbors
       |> Enum.flat_map(fn out_neighbor ->
         target = Map.get(vs, out_neighbor)
-        meta = Map.get(meta, {source_id, out_neighbor})
+        edge_key = {source_id, out_neighbor}
+        meta = Map.get(meta, edge_key)
 
-        Enum.map(meta, fn {label, %{weight: weight, properties: properties}} ->
-          Edge.new(source, target, label: label, weight: weight, properties: properties)
+        Enum.map(meta, fn {label, weight} ->
+          props = get_edge_props(ep, edge_key, label)
+          Edge.new(source, target, label: label, weight: weight, properties: props)
         end)
       end)
     end)
@@ -604,7 +601,8 @@ defmodule Graph do
           out_edges: oe,
           edges: meta,
           vertices: vs,
-          vertex_identifier: vertex_identifier
+          vertex_identifier: vertex_identifier,
+          edge_properties: ep
         },
         v
       ) do
@@ -615,38 +613,36 @@ defmodule Graph do
 
     e_in =
       Enum.flat_map(v_all, fn v2_id ->
-        case Map.get(meta, {v2_id, v_id}) do
+        edge_key = {v2_id, v_id}
+
+        case Map.get(meta, edge_key) do
           nil ->
             []
 
           edge_meta when is_map(edge_meta) ->
             v2 = Map.get(vs, v2_id)
 
-            for {label, meta_value} <- edge_meta do
-              Edge.new(v2, v,
-                label: label,
-                weight: meta_value.weight,
-                properties: meta_value.properties
-              )
+            for {label, weight} <- edge_meta do
+              props = get_edge_props(ep, edge_key, label)
+              Edge.new(v2, v, label: label, weight: weight, properties: props)
             end
         end
       end)
 
     e_out =
       Enum.flat_map(v_all, fn v2_id ->
-        case Map.get(meta, {v_id, v2_id}) do
+        edge_key = {v_id, v2_id}
+
+        case Map.get(meta, edge_key) do
           nil ->
             []
 
           edge_meta when is_map(edge_meta) ->
             v2 = Map.get(vs, v2_id)
 
-            for {label, meta_value} <- edge_meta do
-              Edge.new(v, v2,
-                label: label,
-                weight: meta_value.weight,
-                properties: meta_value.properties
-              )
+            for {label, weight} <- edge_meta do
+              props = get_edge_props(ep, edge_key, label)
+              Edge.new(v, v2, label: label, weight: weight, properties: props)
             end
         end
       end)
@@ -737,14 +733,9 @@ defmodule Graph do
 
       g.edges
       |> Map.get(edge_key, [])
-      |> Enum.reduce([], fn {label, edge_meta}, acc ->
-        edge =
-          Edge.new(v1, v2,
-            label: label,
-            weight: edge_meta.weight,
-            properties: edge_meta.properties
-          )
-
+      |> Enum.reduce([], fn {label, weight}, acc ->
+        props = get_edge_props(g.edge_properties, edge_key, label)
+        edge = Edge.new(v1, v2, label: label, weight: weight, properties: props)
         edge_partitions = g.partition_by.(edge)
 
         if include_edge_for_filtered_partitions?(edge, edge_partitions, partitions, where_fun) do
@@ -790,14 +781,9 @@ defmodule Graph do
 
       g.edges
       |> Map.get(edge_key, [])
-      |> Enum.reduce([], fn {label, edge_meta}, acc ->
-        edge =
-          Edge.new(v1, v2,
-            label: label,
-            weight: edge_meta.weight,
-            properties: edge_meta.properties
-          )
-
+      |> Enum.reduce([], fn {label, weight}, acc ->
+        props = get_edge_props(g.edge_properties, edge_key, label)
+        edge = Edge.new(v1, v2, label: label, weight: weight, properties: props)
         edge_partitions = g.partition_by.(edge)
 
         if include_edge_for_filtered_partitions?(edge, edge_partitions, partitions, where_fun) do
@@ -815,19 +801,26 @@ defmodule Graph do
     Enum.filter(edges, where_fun)
   end
 
+  defp get_edge_props(edge_properties, edge_key, label) do
+    case edge_properties do
+      %{^edge_key => %{^label => props}} -> props
+      _ -> %{}
+    end
+  end
+
   defp edge_list(v1, v2, edge_meta, :undirected) do
-    for {label, %{weight: weight, properties: properties}} <- edge_meta do
+    for {label, weight} <- edge_meta do
       if v1 > v2 do
-        Edge.new(v2, v1, label: label, weight: weight, properties: properties)
+        Edge.new(v2, v1, label: label, weight: weight)
       else
-        Edge.new(v1, v2, label: label, weight: weight, properties: properties)
+        Edge.new(v1, v2, label: label, weight: weight)
       end
     end
   end
 
   defp edge_list(v1, v2, edge_meta, _) do
-    for {label, %{weight: weight, properties: properties}} <- edge_meta do
-      Edge.new(v1, v2, label: label, weight: weight, properties: properties)
+    for {label, weight} <- edge_meta do
+      Edge.new(v1, v2, label: label, weight: weight)
     end
   end
 
@@ -870,13 +863,19 @@ defmodule Graph do
     do_edge(g, v1, v2, label)
   end
 
-  defp do_edge(%__MODULE__{edges: meta, vertex_identifier: vertex_identifier}, v1, v2, label) do
+  defp do_edge(
+         %__MODULE__{edges: meta, vertex_identifier: vertex_identifier, edge_properties: ep},
+         v1,
+         v2,
+         label
+       ) do
     with v1_id <- vertex_identifier.(v1),
          v2_id <- vertex_identifier.(v2),
          edge_key <- {v1_id, v2_id},
          {:ok, edge_meta} <- Map.fetch(meta, edge_key),
-         {:ok, %{weight: weight, properties: properties}} <- Map.fetch(edge_meta, label) do
-      Edge.new(v1, v2, label: label, weight: weight, properties: properties)
+         {:ok, weight} <- Map.fetch(edge_meta, label) do
+      props = get_edge_props(ep, edge_key, label)
+      Edge.new(v1, v2, label: label, weight: weight, properties: props)
     else
       _ ->
         nil
@@ -1280,7 +1279,7 @@ defmodule Graph do
     v1_id = vertex_identifier.(v1)
     v2_id = vertex_identifier.(v2)
 
-    %__MODULE__{in_edges: ie, out_edges: oe, edges: meta} =
+    %__MODULE__{in_edges: ie, out_edges: oe, edges: meta, edge_properties: ep} =
       g = g |> add_vertex(v1) |> add_vertex(v2)
 
     out_neighbors =
@@ -1296,14 +1295,24 @@ defmodule Graph do
       end
 
     edge_meta = Map.get(meta, {v1_id, v2_id}, %{})
-    {label, options_meta} = Edge.options_to_meta(opts)
-    edge_meta = Map.put(edge_meta, label, options_meta)
+    {label, weight} = Edge.options_to_meta(opts)
+    edge_meta = Map.put(edge_meta, label, weight)
+
+    properties = Keyword.get(opts, :properties, %{})
+    edge_key = {v1_id, v2_id}
+
+    ep =
+      if properties == %{} do
+        ep
+      else
+        key_props = Map.get(ep, edge_key, %{})
+        Map.put(ep, edge_key, Map.put(key_props, label, properties))
+      end
 
     g =
       if g.multigraph do
-        edge = Edge.new(v1, v2, label: label, weight: options_meta.weight, properties: opts)
-
-        index_multigraph_edge(g, {v1_id, v2_id}, edge)
+        edge = Edge.new(v1, v2, label: label, weight: weight, properties: properties)
+        index_multigraph_edge(g, edge_key, edge)
       else
         g
       end
@@ -1312,7 +1321,8 @@ defmodule Graph do
       g
       | in_edges: Map.put(ie, v2_id, in_neighbors),
         out_edges: Map.put(oe, v1_id, out_neighbors),
-        edges: Map.put(meta, {v1_id, v2_id}, edge_meta)
+        edges: Map.put(meta, edge_key, edge_meta),
+        edge_properties: ep
     }
   end
 
@@ -1451,10 +1461,12 @@ defmodule Graph do
 
       g = add_vertex(g, v3)
 
-      Enum.reduce(meta, g, fn {label, %{weight: weight, properties: properties}}, acc ->
+      Enum.reduce(meta, g, fn {label, weight}, acc ->
+        props = get_edge_props(g.edge_properties, {v1_id, v2_id}, label)
+
         acc
-        |> add_edge(v1, v3, label: label, weight: weight, properties: properties)
-        |> add_edge(v3, v2, label: label, weight: weight, properties: properties)
+        |> add_edge(v1, v3, label: label, weight: weight, properties: props)
+        |> add_edge(v3, v2, label: label, weight: weight, properties: props)
       end)
     else
       _ -> {:error, :no_such_edge}
@@ -1523,18 +1535,48 @@ defmodule Graph do
          edge_key <- {v1_id, v2_id},
          {:ok, meta} <- Map.fetch(em, edge_key),
          {:ok, _} <- Map.fetch(meta, old_label),
-         {new_label, new_attrs} <- Edge.options_to_meta(opts) do
+         {new_label, new_weight} <- Edge.options_to_meta(opts) do
+      new_properties = Keyword.get(opts, :properties, %{})
+
+      ep =
+        if new_properties == %{} do
+          g.edge_properties
+        else
+          key_props = Map.get(g.edge_properties, edge_key, %{})
+          target_label = if new_label == nil, do: old_label, else: new_label
+          Map.put(g.edge_properties, edge_key, Map.put(key_props, target_label, new_properties))
+        end
+
       case new_label do
         ^old_label ->
-          new_meta = Map.put(meta, old_label, new_attrs)
-          %__MODULE__{g | edges: Map.put(em, edge_key, new_meta)}
+          new_meta = Map.put(meta, old_label, new_weight)
+          %__MODULE__{g | edges: Map.put(em, edge_key, new_meta), edge_properties: ep}
 
         nil ->
-          new_meta = Map.put(meta, old_label, new_attrs)
-          %__MODULE__{g | edges: Map.put(em, edge_key, new_meta)}
+          new_meta = Map.put(meta, old_label, new_weight)
+          %__MODULE__{g | edges: Map.put(em, edge_key, new_meta), edge_properties: ep}
 
         _ ->
-          new_meta = Map.put(Map.delete(meta, old_label), new_label, new_attrs)
+          new_meta = Map.put(Map.delete(meta, old_label), new_label, new_weight)
+
+          # Remove old label's properties, add new label's
+          ep =
+            case Map.get(ep, edge_key) do
+              nil ->
+                ep
+
+              label_props ->
+                label_props = Map.delete(label_props, old_label)
+
+                label_props =
+                  if new_properties == %{},
+                    do: label_props,
+                    else: Map.put(label_props, new_label, new_properties)
+
+                if label_props == %{},
+                  do: Map.delete(ep, edge_key),
+                  else: Map.put(ep, edge_key, label_props)
+            end
 
           if g.multigraph do
             g =
@@ -1542,12 +1584,16 @@ defmodule Graph do
               |> prune_edge_index({v1_id, v1}, {v2_id, v2}, old_label)
               |> index_multigraph_edge(
                 {v1_id, v2_id},
-                Edge.new(v1, v2, label: new_label, weight: new_attrs.weight, properties: opts)
+                Edge.new(v1, v2,
+                  label: new_label,
+                  weight: new_weight,
+                  properties: new_properties
+                )
               )
 
-            %__MODULE__{g | edges: Map.put(em, edge_key, new_meta)}
+            %__MODULE__{g | edges: Map.put(em, edge_key, new_meta), edge_properties: ep}
           else
-            %__MODULE__{g | edges: Map.put(em, edge_key, new_meta)}
+            %__MODULE__{g | edges: Map.put(em, edge_key, new_meta), edge_properties: ep}
           end
       end
     else
@@ -1624,7 +1670,13 @@ defmodule Graph do
   defp prune_all_edge_indexes(%__MODULE__{multigraph: false} = g, _v1, _v2), do: g
 
   defp prune_all_edge_indexes(
-         %__MODULE__{multigraph: true, edges: meta, partition_by: partition_by} = g,
+         %__MODULE__{
+           multigraph: true,
+           edges: meta,
+           partition_by: partition_by,
+           edge_properties: ep
+         } =
+           g,
          {v1_id, v1},
          {v2_id, v2}
        ) do
@@ -1632,10 +1684,9 @@ defmodule Graph do
 
     meta
     |> Map.get(edge_key, %{})
-    |> Enum.reduce(g, fn {label, edge_meta}, acc ->
-      edge =
-        Edge.new(v1, v2, label: label, weight: edge_meta.weight, properties: edge_meta.properties)
-
+    |> Enum.reduce(g, fn {label, weight}, acc ->
+      props = get_edge_props(ep, edge_key, label)
+      edge = Edge.new(v1, v2, label: label, weight: weight, properties: props)
       prune_edge_key_from_partitions(acc, edge_key, v1_id, v2_id, partition_by.(edge))
     end)
   end
@@ -1645,7 +1696,13 @@ defmodule Graph do
   defp prune_edge_index(%__MODULE__{multigraph: false} = g, _v1, _v2, _label), do: g
 
   defp prune_edge_index(
-         %__MODULE__{multigraph: true, edges: meta, partition_by: partition_by} = g,
+         %__MODULE__{
+           multigraph: true,
+           edges: meta,
+           partition_by: partition_by,
+           edge_properties: ep
+         } =
+           g,
          {v1_id, v1},
          {v2_id, v2},
          label
@@ -1653,14 +1710,9 @@ defmodule Graph do
     edge_key = {v1_id, v2_id}
 
     case meta |> Map.get(edge_key, %{}) |> Map.fetch(label) do
-      {:ok, edge_meta} ->
-        edge =
-          Edge.new(v1, v2,
-            label: label,
-            weight: edge_meta.weight,
-            properties: edge_meta.properties
-          )
-
+      {:ok, weight} ->
+        props = get_edge_props(ep, edge_key, label)
+        edge = Edge.new(v1, v2, label: label, weight: weight, properties: props)
         prune_edge_key_from_partitions(g, edge_key, v1_id, v2_id, partition_by.(edge))
 
       :error ->
@@ -1927,7 +1979,10 @@ defmodule Graph do
       [%Graph.Edge{v1: :b, v2: :a}, %Graph.Edge{v1: :c, v2: :b}]
   """
   @spec transpose(t) :: t
-  def transpose(%__MODULE__{in_edges: ie, out_edges: oe, edges: meta, edge_index: ei} = g) do
+  def transpose(
+        %__MODULE__{in_edges: ie, out_edges: oe, edges: meta, edge_index: ei, edge_properties: ep} =
+          g
+      ) do
     meta2 =
       meta
       |> Enum.reduce(%{}, fn {{v1, v2}, meta}, acc -> Map.put(acc, {v2, v1}, meta) end)
@@ -1942,7 +1997,17 @@ defmodule Graph do
         {partition, new_vertex_map}
       end)
 
-    %__MODULE__{g | in_edges: oe, out_edges: ie, edges: meta2, edge_index: ei2}
+    ep2 =
+      Map.new(ep, fn {{v1, v2}, props} -> {{v2, v1}, props} end)
+
+    %__MODULE__{
+      g
+      | in_edges: oe,
+        out_edges: ie,
+        edges: meta2,
+        edge_index: ei2,
+        edge_properties: ep2
+    }
   end
 
   @doc """
@@ -2602,7 +2667,8 @@ defmodule Graph do
           vertices: vs,
           in_edges: ie,
           edges: meta,
-          vertex_identifier: vertex_identifier
+          vertex_identifier: vertex_identifier,
+          edge_properties: ep
         },
         v
       ) do
@@ -2610,13 +2676,11 @@ defmodule Graph do
          {:ok, v_in} <- Map.fetch(ie, v_id) do
       Enum.flat_map(v_in, fn v1_id ->
         v1 = Map.get(vs, v1_id)
+        edge_key = {v1_id, v_id}
 
-        Enum.map(Map.get(meta, {v1_id, v_id}), fn {label, edge_meta} ->
-          Edge.new(v1, v,
-            label: label,
-            weight: edge_meta.weight,
-            properties: edge_meta.properties
-          )
+        Enum.map(Map.get(meta, edge_key), fn {label, weight} ->
+          props = get_edge_props(ep, edge_key, label)
+          Edge.new(v1, v, label: label, weight: weight, properties: props)
         end)
       end)
     else
@@ -2645,7 +2709,8 @@ defmodule Graph do
           multigraph: true,
           vertex_identifier: vertex_identifier,
           edge_index: edge_index,
-          partition_by: partition_by
+          partition_by: partition_by,
+          edge_properties: ep
         },
         v,
         by: partition
@@ -2670,14 +2735,9 @@ defmodule Graph do
 
       edges
       |> Map.get(edge_key, [])
-      |> Enum.map(fn {label, edge_meta} ->
-        edge =
-          Edge.new(v1, v,
-            label: label,
-            weight: edge_meta.weight,
-            properties: edge_meta.properties
-          )
-
+      |> Enum.map(fn {label, weight} ->
+        props = get_edge_props(ep, edge_key, label)
+        edge = Edge.new(v1, v, label: label, weight: weight, properties: props)
         edge_partitions = partition_by.(edge)
 
         if Enum.any?(edge_partitions, fn edge_partition -> edge_partition == partition end) do
@@ -2739,7 +2799,8 @@ defmodule Graph do
           vertices: vs,
           out_edges: oe,
           edges: meta,
-          vertex_identifier: vertex_identifier
+          vertex_identifier: vertex_identifier,
+          edge_properties: ep
         },
         v
       ) do
@@ -2747,13 +2808,11 @@ defmodule Graph do
          {:ok, v_out} <- Map.fetch(oe, v_id) do
       Enum.flat_map(v_out, fn v2_id ->
         v2 = Map.get(vs, v2_id)
+        edge_key = {v_id, v2_id}
 
-        Enum.map(Map.get(meta, {v_id, v2_id}), fn {label, edge_meta} ->
-          Edge.new(v, v2,
-            label: label,
-            weight: edge_meta.weight,
-            properties: edge_meta.properties
-          )
+        Enum.map(Map.get(meta, edge_key), fn {label, weight} ->
+          props = get_edge_props(ep, edge_key, label)
+          Edge.new(v, v2, label: label, weight: weight, properties: props)
         end)
       end)
     else
@@ -2815,7 +2874,8 @@ defmodule Graph do
            multigraph: true,
            edge_index: edge_index,
            vertex_identifier: vertex_identifier,
-           partition_by: partition_by
+           partition_by: partition_by,
+           edge_properties: ep
          },
          v,
          partitions,
@@ -2845,14 +2905,9 @@ defmodule Graph do
 
       edges
       |> Map.get(edge_key, [])
-      |> Enum.reduce([], fn {label, edge_meta}, acc ->
-        edge =
-          Edge.new(v, v2,
-            label: label,
-            weight: edge_meta.weight,
-            properties: edge_meta.properties
-          )
-
+      |> Enum.reduce([], fn {label, weight}, acc ->
+        props = get_edge_props(ep, edge_key, label)
+        edge = Edge.new(v, v2, label: label, weight: weight, properties: props)
         edges_in_partitions = partition_by.(edge)
 
         if include_edge_for_filtered_partitions?(edge, edges_in_partitions, partitions, where_fun) do
@@ -2919,11 +2974,15 @@ defmodule Graph do
         |> Enum.reduce(sg, fn v2_id, sg ->
           v2 = Map.get(vertices, v2_id)
 
-          Enum.reduce(Map.get(meta, {v_id, v2_id}), sg, fn {label, edge_meta}, sg ->
+          edge_key = {v_id, v2_id}
+
+          Enum.reduce(Map.get(meta, edge_key), sg, fn {label, weight}, sg ->
+            props = get_edge_props(graph.edge_properties, edge_key, label)
+
             Graph.add_edge(sg, v, v2,
               label: label,
-              weight: edge_meta.weight,
-              properties: edge_meta.properties
+              weight: weight,
+              properties: props
             )
           end)
         end)

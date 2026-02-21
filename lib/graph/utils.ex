@@ -83,7 +83,7 @@ defmodule Graph.Utils do
 
   def edge_weight(%Graph{type: :directed, edges: meta}, a, b) do
     Map.fetch!(meta, {a, b})
-    |> Enum.map(fn {_label, %{weight: weight}} -> weight end)
+    |> Enum.map(fn {_label, weight} -> weight end)
     |> Enum.min()
   end
 
@@ -96,37 +96,40 @@ defmodule Graph.Utils do
 
           edge_meta when is_map(edge_meta) ->
             edge_meta
-            |> Enum.map(fn {_label, %{weight: weight}} -> weight end)
+            |> Enum.map(fn {_label, weight} -> weight end)
             |> Enum.min()
         end
 
       edge_meta when is_map(edge_meta) ->
         edge_meta
-        |> Enum.map(fn {_label, %{weight: weight}} -> weight end)
+        |> Enum.map(fn {_label, weight} -> weight end)
         |> Enum.min()
     end
   end
 
   def edge_weight(
-        %Graph{type: :directed, edges: meta, partition_by: partition_by},
+        %Graph{type: :directed, edges: meta, partition_by: partition_by, edge_properties: ep},
         a,
         b,
         partitions
       ) do
+    edge_key = {a, b}
+
     meta
-    |> Map.fetch!({a, b})
-    |> filter_by_partitions(partition_by, partitions)
-    |> Enum.map(fn {_label, %{weight: weight}} -> weight end)
+    |> Map.fetch!(edge_key)
+    |> filter_by_partitions(partition_by, partitions, ep, edge_key)
+    |> Enum.map(fn {_label, weight} -> weight end)
     |> Enum.min()
   end
 
   def edge_weight(
-        %Graph{type: :undirected, edges: meta, partition_by: partition_by},
+        %Graph{type: :undirected, edges: meta, partition_by: partition_by, edge_properties: ep},
         a,
         b,
         partitions
       ) do
-    edge_meta = Map.get(meta, {a, b}) || Map.get(meta, {b, a})
+    edge_key = {a, b}
+    edge_meta = Map.get(meta, edge_key) || Map.get(meta, {b, a})
 
     case edge_meta do
       nil ->
@@ -134,15 +137,21 @@ defmodule Graph.Utils do
 
       edge_meta when is_map(edge_meta) ->
         edge_meta
-        |> filter_by_partitions(partition_by, partitions)
-        |> Enum.map(fn {_label, %{weight: weight}} -> weight end)
+        |> filter_by_partitions(partition_by, partitions, ep, edge_key)
+        |> Enum.map(fn {_label, weight} -> weight end)
         |> Enum.min()
     end
   end
 
-  defp filter_by_partitions(edge_meta, partition_by, partitions) do
-    Enum.filter(edge_meta, fn {label, %{weight: weight, properties: properties}} ->
-      eps = partition_by.(%{label: label, weight: weight, properties: properties})
+  defp filter_by_partitions(edge_meta, partition_by, partitions, ep, edge_key) do
+    Enum.filter(edge_meta, fn {label, weight} ->
+      props =
+        case ep do
+          %{^edge_key => %{^label => p}} -> p
+          _ -> %{}
+        end
+
+      eps = partition_by.(%{label: label, weight: weight, properties: props})
       Enum.any?(eps, fn ep -> ep in partitions end)
     end)
   end

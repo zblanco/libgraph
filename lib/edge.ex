@@ -63,13 +63,12 @@ defmodule Graph.Edge do
   def options_to_meta(opts) when is_list(opts) do
     label = Keyword.get(opts, :label)
     weight = Keyword.get(opts, :weight, 1)
-    properties = Keyword.get(opts, :properties, %{})
 
-    case {label, %{weight: weight, properties: properties}} do
-      {label, %{weight: w} = meta} when is_number(w) ->
-        {label, meta}
+    case {label, weight} do
+      {_, w} = meta when is_number(w) ->
+        meta
 
-      _other ->
+      {_, _} ->
         raise ArgumentError, message: "invalid value for :weight, must be an integer"
     end
   end
