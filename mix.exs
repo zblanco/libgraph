@@ -21,7 +21,10 @@ defmodule Graph.Mixfile do
         "coveralls.detail": :test,
         "coveralls.post": :test,
         docs: :docs,
-        bench: :bench
+        bench: :bench,
+        "bench.multigraph": :bench,
+        "bench.multigraph_creation": :bench,
+        "bench.multigraph_memory": :bench
       ]
     ]
   end
@@ -53,7 +56,9 @@ defmodule Graph.Mixfile do
       {:excoveralls, "~> 0.7", only: [:test]},
       {:dialyxir, "~> 1.0", only: [:dev], runtime: false},
       {:ex_doc, ">= 0.0.0", only: :dev},
-      {:ssl_verify_fun, "~> 1.1", manager: :rebar3, only: [:test], override: true}
+      {:ssl_verify_fun, "~> 1.1", manager: :rebar3, only: [:test], override: true},
+      {:tidewave, "~> 0.4", only: :dev},
+      {:bandit, "~> 1.0", only: :dev}
     ]
   end
 
@@ -70,7 +75,12 @@ defmodule Graph.Mixfile do
       "bench.create": ["run bench/create.exs"],
       "bench.k_core": ["run bench/k_core.exs"],
       "bench.shortest_path": ["run bench/shortest_path.exs"],
-      "bench.topsort": ["run bench/topsort.exs"]
+      "bench.topsort": ["run bench/topsort.exs"],
+      "bench.multigraph": ["run bench/multigraph.exs"],
+      "bench.multigraph_creation": ["run bench/multigraph_creation.exs"],
+      "bench.multigraph_memory": ["run bench/multigraph_memory.exs"],
+      tidewave:
+        "run --no-halt -e 'Agent.start(fn -> Bandit.start_link(plug: Tidewave, port: 4000) end)'"
     ]
   end
 

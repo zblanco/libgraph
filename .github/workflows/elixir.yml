@@ -13,14 +13,14 @@ jobs:
           - elixir: 1.14.5
             otp: 24.3
 
-          - elixir: 1.15.4
+          - elixir: 1.15.8
             otp: 25.3
 
           - elixir: 1.16.3
             otp: 26.2
 
-          - otp: 27.2
-            elixir: 1.18.1
+          - elixir: 1.18.2
+            otp: 27.2
     steps:
       - uses: actions/checkout@v2
       - uses: erlef/setup-beam@v1

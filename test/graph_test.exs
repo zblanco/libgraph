@@ -118,7 +118,10 @@ defmodule GraphTest do
         ])
 
       g = Graph.delete_edges(g, [{:b, :c}, {:b, :a}])
-      refute Map.has_key?(g.edge_index, {g.vertex_identifier.(:b), {:complex, :label}})
+      refute Map.has_key?(g.edge_index, {:complex, :label})
+      assert Enum.empty?(Graph.edges(g, by: [{:complex, :label}]))
+      # nil partition still exists for a->b nil-label edge
+      assert Map.has_key?(g.edge_index, nil)
     end
 
     test "delete_edge/3 removes only a multigraph's properties and index for the given partition key/label" do
@@ -176,6 +179,212 @@ defmodule GraphTest do
 
       runnable_targets = Enum.map(runnable_edges, & &1.v2) |> Enum.sort()
       assert runnable_targets == [:step_a, :step_b]
+    end
+
+    test "delete_vertex prunes edge_index" do
+      g =
+        Graph.new(multigraph: true)
+        |> Graph.add_edges([
+          {:a, :b, label: :foo},
+          {:a, :c, label: :bar},
+          {:b, :c, label: :foo},
+          {:c, :d, label: :baz}
+        ])
+
+      assert Map.has_key?(g.edge_index, :foo)
+      assert Map.has_key?(g.edge_index, :bar)
+
+      g = Graph.delete_vertex(g, :a)
+
+      refute Graph.has_vertex?(g, :a)
+      # :bar partition only had a->c, should be gone
+      refute Map.has_key?(g.edge_index, :bar)
+      # :foo partition still has b->c
+      assert Map.has_key?(g.edge_index, :foo)
+      assert [%Edge{v1: :b, v2: :c, label: :foo}] = Graph.edges(g, by: [:foo])
+
+      # no stale references to deleted vertex
+      Enum.each(g.edge_index, fn {_partition, vertex_map} ->
+        refute Map.has_key?(vertex_map, g.vertex_identifier.(:a))
+
+        Enum.each(vertex_map, fn {_v_id, edge_keys} ->
+          Enum.each(edge_keys, fn {v1_id, v2_id} ->
+            refute v1_id == g.vertex_identifier.(:a)
+            refute v2_id == g.vertex_identifier.(:a)
+          end)
+        end)
+      end)
+    end
+
+    test "delete_vertices prunes edge_index" do
+      g =
+        Graph.new(multigraph: true)
+        |> Graph.add_edges([
+          {:a, :b, label: :foo},
+          {:b, :c, label: :bar},
+          {:c, :d, label: :baz}
+        ])
+
+      g = Graph.delete_vertices(g, [:a, :c])
+
+      refute Map.has_key?(g.edge_index, :foo)
+      refute Map.has_key?(g.edge_index, :bar)
+      refute Map.has_key?(g.edge_index, :baz)
+      assert g.edge_index == %{}
+    end
+
+    test "transpose preserves edge_index with flipped edge keys" do
+      g =
+        Graph.new(multigraph: true)
+        |> Graph.add_edges([
+          {:a, :b, label: :foo},
+          {:b, :c, label: :bar}
+        ])
+
+      gt = Graph.transpose(g)
+
+      assert [%Edge{v1: :b, v2: :a, label: :foo}] = Graph.out_edges(gt, :b, by: :foo)
+      assert [%Edge{v1: :c, v2: :b, label: :bar}] = Graph.out_edges(gt, :c, by: :bar)
+      assert Enum.empty?(Graph.out_edges(gt, :a, by: :foo))
+    end
+
+    test "split_edge prunes old edge and indexes new edges" do
+      g =
+        Graph.new(multigraph: true)
+        |> Graph.add_edge(:a, :c, label: :foo)
+        |> Graph.add_edge(:a, :c, label: :bar)
+
+      g = Graph.split_edge(g, :a, :c, :b)
+
+      # old a->c edges should be gone from index
+      a_id = g.vertex_identifier.(:a)
+      c_id = g.vertex_identifier.(:c)
+
+      Enum.each(g.edge_index, fn {_partition, vertex_map} ->
+        Enum.each(vertex_map, fn {_v_id, edge_keys} ->
+          refute MapSet.member?(edge_keys, {a_id, c_id})
+        end)
+      end)
+
+      # new edges a->b and b->c should be indexed
+      assert [%Edge{v1: :a, v2: :b, label: :foo}] = Graph.out_edges(g, :a, by: :foo)
+      assert [%Edge{v1: :a, v2: :b, label: :bar}] = Graph.out_edges(g, :a, by: :bar)
+      assert [%Edge{v1: :b, v2: :c, label: :foo}] = Graph.out_edges(g, :b, by: :foo)
+      assert [%Edge{v1: :b, v2: :c, label: :bar}] = Graph.out_edges(g, :b, by: :bar)
+    end
+
+    test "subgraph preserves multigraph settings and rebuilds index" do
+      g =
+        Graph.new(multigraph: true)
+        |> Graph.add_edges([
+          {:a, :b, label: :foo},
+          {:b, :c, label: :bar},
+          {:c, :d, label: :baz}
+        ])
+
+      sg = Graph.subgraph(g, [:a, :b, :c])
+
+      assert sg.multigraph == true
+      assert [%Edge{v1: :a, v2: :b, label: :foo}] = Graph.edges(sg, by: [:foo])
+      assert [%Edge{v1: :b, v2: :c, label: :bar}] = Graph.edges(sg, by: [:bar])
+      # :baz edge is not in subgraph since :d is excluded
+      assert Enum.empty?(Graph.edges(sg, by: [:baz]))
+    end
+
+    test "BFS traversal using multigraph partitions" do
+      graph =
+        Graph.new(multigraph: true)
+        |> Graph.add_edges([
+          {:a, :b, label: :foo},
+          {:a, :b, label: :bar},
+          {:a, :c, label: :foo},
+          {:b, :d, label: :bar},
+          {:c, :d, label: :foo}
+        ])
+
+      # BFS following only :foo edges: a -> b, a -> c, c -> d
+      foo_result = Graph.Reducers.Bfs.map(graph, fn v -> v end, by: :foo)
+      assert :a == hd(foo_result)
+      assert MapSet.new(foo_result) == MapSet.new([:a, :b, :c, :d])
+
+      # BFS following only :bar edges: a -> b, b -> d
+      bar_result = Graph.Reducers.Bfs.map(graph, fn v -> v end, by: :bar)
+      assert :a == hd(bar_result)
+      assert MapSet.new(bar_result) == MapSet.new([:a, :b, :d])
+    end
+
+    test "DFS traversal using multigraph partitions" do
+      graph =
+        Graph.new(multigraph: true)
+        |> Graph.add_edges([
+          {:a, :b, label: :foo},
+          {:a, :b, label: :bar},
+          {:a, :c, label: :foo},
+          {:b, :d, label: :bar},
+          {:c, :d, label: :foo}
+        ])
+
+      # DFS following only :foo edges: a -> b, a -> c -> d
+      foo_result = Graph.Reducers.Dfs.map(graph, fn v -> v end, by: :foo)
+      assert :a == hd(foo_result)
+      assert MapSet.new(foo_result) == MapSet.new([:a, :b, :c, :d])
+
+      # DFS following only :bar edges: a -> b -> d
+      bar_result = Graph.Reducers.Dfs.map(graph, fn v -> v end, by: :bar)
+      assert :a == hd(bar_result)
+      assert MapSet.new(bar_result) == MapSet.new([:a, :b, :d])
+    end
+
+    test "Dijkstra with multigraph partition filtering" do
+      graph =
+        Graph.new(multigraph: true)
+        |> Graph.add_edges([
+          {:a, :b, label: :fast, weight: 1},
+          {:a, :c, label: :slow, weight: 10},
+          {:b, :d, label: :fast, weight: 1},
+          {:c, :d, label: :slow, weight: 1}
+        ])
+
+      # Via :fast edges only: a->b->d, cost 2
+      assert [:a, :b, :d] = Graph.dijkstra(graph, :a, :d, by: :fast)
+
+      # Via :slow edges only: a->c->d, cost 11
+      assert [:a, :c, :d] = Graph.dijkstra(graph, :a, :d, by: :slow)
+
+      # No :fast path from :a to :c
+      assert nil == Graph.dijkstra(graph, :a, :c, by: :fast)
+    end
+
+    test "A* with multigraph partition filtering" do
+      graph =
+        Graph.new(multigraph: true)
+        |> Graph.add_edges([
+          {:a, :b, label: :fast, weight: 1},
+          {:a, :c, label: :slow, weight: 10},
+          {:b, :d, label: :fast, weight: 1},
+          {:c, :d, label: :slow, weight: 1}
+        ])
+
+      assert [:a, :b, :d] = Graph.a_star(graph, :a, :d, fn _ -> 0 end, by: :fast)
+      assert [:a, :c, :d] = Graph.a_star(graph, :a, :d, fn _ -> 0 end, by: :slow)
+    end
+
+    test "Bellman-Ford with multigraph partition filtering" do
+      graph =
+        Graph.new(multigraph: true)
+        |> Graph.add_edges([
+          {:a, :b, label: :fast, weight: 1},
+          {:a, :c, label: :slow, weight: 10},
+          {:b, :d, label: :fast, weight: 2},
+          {:c, :d, label: :slow, weight: 1}
+        ])
+
+      result = Graph.bellman_ford(graph, :a, by: :fast)
+      assert result[:a] == 0
+      assert result[:b] == 1
+      assert result[:d] == 3
+      # :c is not reachable via :fast edges
+      assert result[:c] == :infinity
     end
   end
 

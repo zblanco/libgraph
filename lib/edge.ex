@@ -25,13 +25,21 @@ defmodule Graph.Edge do
   @type edge_opts :: [edge_opt]
 
   @doc """
-  Defines a new edge and accepts optional values for weight and label.
-  The defaults of a weight of 1 and no label will be used if the options do
-  not specify otherwise.
+  Defines a new edge and accepts optional values for weight, label, and properties.
+
+  ## Options
+
+  - `:weight` - the weight of the edge (integer or float, default: `1`)
+  - `:label` - the label for the edge (default: `nil`)
+  - `:properties` - an arbitrary map of additional metadata (default: `%{}`)
 
   An error will be thrown if weight is not an integer or float.
 
-  ## Example
+  ## Examples
+
+      iex> edge = Graph.Edge.new(:a, :b, label: :foo, weight: 2, properties: %{color: "red"})
+      ...> {edge.label, edge.weight, edge.properties}
+      {:foo, 2, %{color: "red"}}
 
       iex> Graph.new |> Graph.add_edge(Graph.Edge.new(:a, :b, weight: "1"))
       ** (ArgumentError) invalid value for :weight, must be an integer

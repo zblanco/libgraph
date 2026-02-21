@@ -1,6 +1,6 @@
 defmodule Graph.Utils do
   @moduledoc false
-  @compile {:inline, [vertex_id: 1, edge_weight: 3]}
+  @compile {:inline, [{:vertex_id, 1}, {:edge_weight, 3}, {:edge_weight, 4}]}
 
   @binary_heap_limit 64
 
@@ -105,6 +105,46 @@ defmodule Graph.Utils do
         |> Enum.map(fn {_label, %{weight: weight}} -> weight end)
         |> Enum.min()
     end
+  end
+
+  def edge_weight(
+        %Graph{type: :directed, edges: meta, partition_by: partition_by},
+        a,
+        b,
+        partitions
+      ) do
+    meta
+    |> Map.fetch!({a, b})
+    |> filter_by_partitions(partition_by, partitions)
+    |> Enum.map(fn {_label, %{weight: weight}} -> weight end)
+    |> Enum.min()
+  end
+
+  def edge_weight(
+        %Graph{type: :undirected, edges: meta, partition_by: partition_by},
+        a,
+        b,
+        partitions
+      ) do
+    edge_meta = Map.get(meta, {a, b}) || Map.get(meta, {b, a})
+
+    case edge_meta do
+      nil ->
+        []
+
+      edge_meta when is_map(edge_meta) ->
+        edge_meta
+        |> filter_by_partitions(partition_by, partitions)
+        |> Enum.map(fn {_label, %{weight: weight}} -> weight end)
+        |> Enum.min()
+    end
+  end
+
+  defp filter_by_partitions(edge_meta, partition_by, partitions) do
+    Enum.filter(edge_meta, fn {label, %{weight: weight, properties: properties}} ->
+      eps = partition_by.(%{label: label, weight: weight, properties: properties})
+      Enum.any?(eps, fn ep -> ep in partitions end)
+    end)
   end
 
   # 2^32

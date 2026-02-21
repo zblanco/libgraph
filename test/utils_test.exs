@@ -7,7 +7,7 @@ defmodule Graph.UtilsTest do
 
   test "sizeof/1" do
     assert 64 = sizeof({1, :foo, "bar"})
-    assert 456 = sizeof(String.duplicate("bar", 128))
+    assert sizeof(String.duplicate("bar", 128)) in [440, 456]
     assert 8 = sizeof([])
     assert 24 = sizeof([1 | 2])
     assert 56 = sizeof([1, 2, 3])

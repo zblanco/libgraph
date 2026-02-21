@@ -45,6 +45,93 @@ def deps do
 end
 ```
 
+## Multigraphs
+
+Libgraph supports multigraphs — graphs where multiple edges with different labels can exist between
+the same pair of vertices. When `multigraph: true` is enabled, an edge adjacency index is maintained
+that allows O(1) lookup of edges by partition key, avoiding full edge scans.
+
+### Creating a multigraph
+
+```elixir
+g =
+  Graph.new(multigraph: true)
+  |> Graph.add_edges([
+    {:a, :b, label: :uses},
+    {:a, :b, label: :contains},
+    {:b, :c, label: :uses},
+    {:b, :c, label: :owns, weight: 3}
+  ])
+```
+
+### Querying by partition
+
+By default, edges are partitioned by their label (via `Graph.Utils.by_edge_label/1`). You can
+query edges belonging to a specific partition:
+
+```elixir
+# Get only :uses edges
+Graph.edges(g, by: :uses)
+#=> [%Graph.Edge{v1: :a, v2: :b, label: :uses}, %Graph.Edge{v1: :b, v2: :c, label: :uses}]
+
+# Get out edges from :a with label :contains
+Graph.out_edges(g, :a, by: :contains)
+#=> [%Graph.Edge{v1: :a, v2: :b, label: :contains}]
+
+# Filter edges with a predicate
+Graph.edges(g, where: fn edge -> edge.weight > 2 end)
+#=> [%Graph.Edge{v1: :b, v2: :c, label: :owns, weight: 3}]
+```
+
+### Custom partition functions
+
+You can provide a custom `partition_by` function to control how edges are indexed:
+
+```elixir
+g = Graph.new(multigraph: true, partition_by: fn edge -> [edge.weight] end)
+|> Graph.add_edges([{:a, :b, weight: 1}, {:b, :c, weight: 2}])
+
+Graph.edges(g, by: 1)
+#=> [%Graph.Edge{v1: :a, v2: :b, weight: 1}]
+```
+
+### Partition-filtered traversals
+
+BFS, DFS, Dijkstra, A*, and Bellman-Ford all support a `by:` option to restrict traversal to
+edges in specific partitions:
+
+```elixir
+g =
+  Graph.new(multigraph: true)
+  |> Graph.add_edges([
+    {:a, :b, label: :fast, weight: 1},
+    {:a, :c, label: :slow, weight: 10},
+    {:b, :d, label: :fast, weight: 1},
+    {:c, :d, label: :slow, weight: 1}
+  ])
+
+# Shortest path using only :fast edges
+Graph.dijkstra(g, :a, :d, by: :fast)
+#=> [:a, :b, :d]
+
+# BFS following only :fast edges
+Graph.Reducers.Bfs.map(g, & &1, by: :fast)
+#=> [:a, :b, :d]
+```
+
+### Edge properties
+
+Edges now support an arbitrary `properties` map for storing additional metadata:
+
+```elixir
+g = Graph.new()
+|> Graph.add_edge(:a, :b, label: :link, properties: %{color: "red", style: :dashed})
+
+[edge] = Graph.edges(g)
+edge.properties
+#=> %{color: "red", style: :dashed}
+```
+
 ## Rationale
 
 The original motivation for me to start working on this library is the fact that `:digraph` requires a
