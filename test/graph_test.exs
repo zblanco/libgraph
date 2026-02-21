@@ -397,10 +397,12 @@ defmodule GraphTest do
           {:a, :b, label: :foo, properties: %{bar: :foo}}
         ])
 
+      edges = Graph.out_edges(g, :a) |> Enum.sort_by(fn e -> {e.label != nil, e.label} end)
+
       assert [
                %Edge{v1: :a, v2: :b, properties: %{foo: :bar}},
                %Edge{v1: :a, v2: :b, label: :foo, properties: %{bar: :foo}}
-             ] = Graph.out_edges(g, :a)
+             ] = edges
     end
 
     test "updating edge properties" do
@@ -413,10 +415,12 @@ defmodule GraphTest do
         |> Graph.update_edge(:a, :b, properties: %{ham: :potato})
         |> Graph.update_labelled_edge(:a, :b, :foo, properties: %{potato: :ham})
 
+      edges = Graph.out_edges(g, :a) |> Enum.sort_by(fn e -> {e.label != nil, e.label} end)
+
       assert [
                %Edge{v1: :a, v2: :b, properties: %{ham: :potato}},
                %Edge{v1: :a, v2: :b, label: :foo, properties: %{potato: :ham}}
-             ] = Graph.out_edges(g, :a)
+             ] = edges
     end
 
     test "adding edge struct with properties" do
@@ -486,16 +490,22 @@ defmodule GraphTest do
     doc = Inspect.Algebra.format(Inspect.Algebra.to_doc(g, %Inspect.Opts{structs: false}), 99999)
     assert ^structs_false = :erlang.iolist_to_binary(doc)
 
-    # pretty printed
+    # pretty printed - edge order within a vertex pair is non-deterministic (map iteration)
     str = "#{inspect(g)}"
 
-    assert "#Graph<type: directed, vertices: [:a, :b, :c], edges: [:a -> :b, :a -[foo]-> :b, :b -[{:complex, :label}]-> :a, :b -> :c]>" =
-             str
+    assert str =~ ~r/^#Graph<type: directed, vertices: \[:a, :b, :c\], edges: \[/
+    assert str =~ ":a -> :b"
+    assert str =~ ":a -[foo]-> :b"
+    assert str =~ ":b -[{:complex, :label}]-> :a"
+    assert str =~ ":b -> :c"
 
     ustr = "#{inspect(ug)}"
 
-    assert "#Graph<type: undirected, vertices: [:a, :b, :c], edges: [:a <-> :b, :a <-[foo]-> :b, :a <-[{:complex, :label}]-> :b, :b <-> :c]>" =
-             ustr
+    assert ustr =~ ~r/^#Graph<type: undirected, vertices: \[:a, :b, :c\], edges: \[/
+    assert ustr =~ ":a <-> :b"
+    assert ustr =~ ":a <-[foo]-> :b"
+    assert ustr =~ ":a <-[{:complex, :label}]-> :b"
+    assert ustr =~ ":b <-> :c"
 
     # large graph
     g = Enum.reduce(1..150, Graph.new(), fn i, g -> Graph.add_edge(g, i, i + 1) end)

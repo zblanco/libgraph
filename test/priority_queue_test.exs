@@ -10,7 +10,9 @@ defmodule PriorityQueue.Test do
       end)
 
     str = "#{inspect(pq)}"
-    assert "#PriorityQueue<size: 5, queue: ~c\"abcde\">" = str
+    # Elixir 1.15+ uses ~c"..." for charlists, older versions use '...'
+    assert str == "#PriorityQueue<size: 5, queue: ~c\"abcde\">" or
+             str == "#PriorityQueue<size: 5, queue: 'abcde'>"
   end
 
   test "can enqueue random elements and pull them out in priority order" do
