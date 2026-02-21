@@ -1528,7 +1528,6 @@ defmodule Graph do
   defp prune_edge_index(
          %__MODULE__{
            multigraph: true,
-           edge_index: edge_index,
            edges: meta,
            partition_by: partition_by
          } = g,
@@ -1548,14 +1547,14 @@ defmodule Graph do
         v1_key = {v1_id, edge_p}
         v2_key = {v2_id, edge_p}
 
-        edge_index =
-          edge_index
+        updated_edge_index =
+          acc.edge_index
           |> Map.delete(v1_key)
           |> Map.delete(v2_key)
 
         %__MODULE__{
           acc
-          | edge_index: edge_index
+          | edge_index: updated_edge_index
         }
       end)
     end)
@@ -1564,7 +1563,6 @@ defmodule Graph do
   defp prune_edge_index(
          %__MODULE__{
            multigraph: true,
-           edge_index: edge_index,
            edges: meta,
            partition_by: partition_by
          } = g,
@@ -1584,25 +1582,47 @@ defmodule Graph do
 
     edge_partitions = partition_by.(edge)
 
+    edge_key = {v1_id, v2_id}
+
     Enum.reduce(edge_partitions, g, fn edge_p, acc ->
       partition =
-        edge_index
+        acc.edge_index
         |> Map.get(edge_p, %{})
-        |> Map.reject(fn {k, v} ->
-          (k == v1_id and MapSet.member?(v, {v1_id, v2_id})) or
-            (k == v2_id and MapSet.member?(v, {v1_id, v2_id}))
+        |> Enum.reduce(%{}, fn {k, v}, new_partition ->
+          cond do
+            k == v1_id ->
+              remaining = MapSet.delete(v, edge_key)
+
+              if MapSet.size(remaining) > 0 do
+                Map.put(new_partition, k, remaining)
+              else
+                new_partition
+              end
+
+            k == v2_id ->
+              remaining = MapSet.delete(v, edge_key)
+
+              if MapSet.size(remaining) > 0 do
+                Map.put(new_partition, k, remaining)
+              else
+                new_partition
+              end
+
+            true ->
+              Map.put(new_partition, k, v)
+          end
         end)
 
-      edge_index =
+      updated_edge_index =
         if not Enum.empty?(partition) do
-          Map.put(edge_index, edge_p, partition)
+          Map.put(acc.edge_index, edge_p, partition)
         else
-          Map.delete(edge_index, edge_p)
+          Map.delete(acc.edge_index, edge_p)
         end
 
       %__MODULE__{
         acc
-        | edge_index: edge_index
+        | edge_index: updated_edge_index
       }
     end)
   end

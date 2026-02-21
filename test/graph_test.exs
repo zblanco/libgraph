@@ -156,30 +156,27 @@ defmodule GraphTest do
       assert Map.has_key?(g.edge_index[:baz], g.vertex_identifier.(:a))
     end
 
-    # test "BFS traversal using multigraph partitions" do
-    #   graph =
-    #     Graph.new(multigraph: true)
-    #     |> Graph.add_edges([
-    #       {:a, :b, label: :foo},
-    #       {:a, :b, label: :bar},
-    #       {:b, :c, weight: 3},
-    #       {:b, :a, label: {:complex, :label}}
-    #     ])
+    test "update_labelled_edge preserves sibling edges in partition index" do
+      g =
+        Graph.new(multigraph: true)
+        |> Graph.add_edge(:fact, :join, label: :runnable)
+        |> Graph.add_edge(:fact, :step_a, label: :runnable)
+        |> Graph.add_edge(:fact, :step_b, label: :runnable)
 
-    #   assert Graph.bfs(graph, :a) == [:a, :b, :c]
-    # end
+      assert length(Graph.edges(g, by: [:runnable])) == 3
 
-    # test "DFS traversal using multigraph partitions" do
-    # end
+      g = Graph.update_labelled_edge(g, :fact, :join, :runnable, label: :ran)
 
-    # test "Dijkstra traversal using multigraph partitions" do
-    # end
+      ran_edges = Graph.edges(g, by: [:ran])
+      assert length(ran_edges) == 1
+      assert hd(ran_edges).v1 == :fact and hd(ran_edges).v2 == :join
 
-    # test "A* traversal using multigraph partitions" do
-    # end
+      runnable_edges = Graph.edges(g, by: [:runnable])
+      assert length(runnable_edges) == 2
 
-    # test "Bellman-Ford traversal using multigraph partitions" do
-    # end
+      runnable_targets = Enum.map(runnable_edges, & &1.v2) |> Enum.sort()
+      assert runnable_targets == [:step_a, :step_b]
+    end
   end
 
   describe "edge properties" do
