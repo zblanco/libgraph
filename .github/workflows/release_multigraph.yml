@@ -1,0 +1,64 @@
+name: release_multigraph
+
+on:
+  push:
+    branches:
+      - "**"
+    tags:
+      - "v*"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - elixir: "1.14.5"
+            otp: "24.3"
+          - elixir: "1.15.8"
+            otp: "25.3"
+          - elixir: "1.16.3"
+            otp: "26.2"
+          - elixir: "1.18.2"
+            otp: "27.2"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: ${{ matrix.elixir }}
+          otp-version: ${{ matrix.otp }}
+
+      - run: mix local.hex --force
+      - run: mix local.rebar --force
+      - run: mix deps.get
+      - run: mix test
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      MIX_ENV: dev
+      HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.18.2"
+          otp-version: "27.2"
+
+      - run: mix local.hex --force
+      - run: mix local.rebar --force
+      - run: mix deps.get
+      - run: mix test
+      - run: mix hex.publish package --yes
+      - run: mix hex.publish docs --yes

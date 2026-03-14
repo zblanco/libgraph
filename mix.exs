@@ -4,13 +4,14 @@ defmodule Graph.Mixfile do
   def project do
     [
       app: :libgraph,
-      version: "0.16.0",
+      version: "0.16.1-mg.1",
       elixir: "~> 1.10",
       build_embedded: Mix.env() == :prod,
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       elixirc_paths: elixirc_paths(Mix.env()),
-      description: "A high-performance graph datastructure library for Elixir projects",
+      description:
+        "A high-performance graph datastructure library for Elixir projects with multigraph support",
       package: package(),
       test_coverage: [tool: ExCoveralls],
       aliases: aliases(),
@@ -86,10 +87,14 @@ defmodule Graph.Mixfile do
 
   defp package do
     [
+      name: "multigraph",
       files: ["lib", "mix.exs", "README.md", "LICENSE"],
-      maintainers: ["Paul Schoenfelder"],
+      maintainers: ["Your Name"],
       licenses: ["MIT"],
-      links: %{GitHub: "https://github.com/bitwalker/libgraph"}
+      links: %{
+        :GitHub => "https://github.com/zblanco/libgraph",
+        "Upstream PR" => "https://github.com/bitwalker/libgraph/pull/81"
+      }
     ]
   end
 end
