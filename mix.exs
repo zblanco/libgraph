@@ -5,7 +5,7 @@ defmodule Graph.Mixfile do
     [
       app: :libgraph,
       version: "0.16.1-mg.1",
-      elixir: "~> 1.10",
+      elixir: "~> 1.14",
       build_embedded: Mix.env() == :prod,
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -56,7 +56,7 @@ defmodule Graph.Mixfile do
       {:stream_data, "~> 0.5", only: [:test]},
       {:excoveralls, "~> 0.7", only: [:test]},
       {:dialyxir, "~> 1.0", only: [:dev], runtime: false},
-      {:ex_doc, ">= 0.0.0", only: :dev},
+      {:ex_doc, "~> 0.34", only: [:dev, :docs], runtime: false, warn_if_outdated: true},
       {:ssl_verify_fun, "~> 1.1", manager: :rebar3, only: [:test], override: true},
       {:tidewave, "~> 0.4", only: :dev},
       {:bandit, "~> 1.0", only: :dev}
@@ -91,8 +91,9 @@ defmodule Graph.Mixfile do
       files: ["lib", "mix.exs", "README.md", "LICENSE"],
       maintainers: ["Zack White"],
       licenses: ["MIT"],
+      source_url: "https://github.com/zblanco/libgraph/tree/zw/multigraph-fork",
       links: %{
-        :GitHub => "https://github.com/zblanco/libgraph",
+        :GitHub => "https://github.com/zblanco/libgraph/tree/zw/multigraph-fork",
         "Upstream PR" => "https://github.com/bitwalker/libgraph/pull/81"
       }
     ]
