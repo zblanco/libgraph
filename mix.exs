@@ -89,7 +89,7 @@ defmodule Graph.Mixfile do
     [
       name: "multigraph",
       files: ["lib", "mix.exs", "README.md", "LICENSE"],
-      maintainers: ["Your Name"],
+      maintainers: ["Zack White"],
       licenses: ["MIT"],
       links: %{
         :GitHub => "https://github.com/zblanco/libgraph",
