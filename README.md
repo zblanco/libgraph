@@ -1,10 +1,10 @@
-# libgraph
+# Multigraph
 
 [![Master](https://travis-ci.org/bitwalker/libgraph.svg?branch=master)](https://travis-ci.org/bitwalker/libgraph)
 [![Hex.pm Version](http://img.shields.io/hexpm/v/libgraph.svg?style=flat)](https://hex.pm/packages/libgraph)
 [![Coverage Status](https://coveralls.io/repos/github/bitwalker/libgraph/badge.svg?branch=master)](https://coveralls.io/github/bitwalker/libgraph?branch=master)
 
-[Documentation](https://hexdocs.pm/libgraph)
+[Documentation](https://hexdocs.pm/multigraph/Graph.html)
 
 ## About
 
@@ -37,11 +37,11 @@ which is a very helpful walkthrough of the library and what can be built with it
 ## Installation
 
 If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `libgraph` to your list of dependencies in `mix.exs`:
+by adding `multigraph` to your list of dependencies in `mix.exs`:
 
 ```elixir
 def deps do
-  [{:libgraph, "~> 0.16.1-mg.1", hex: :multigraph}]
+  [{:multigraph, "~> 0.16.1-mg.2"}]
 end
 ```
 

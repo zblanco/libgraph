@@ -3,8 +3,8 @@ defmodule Graph.Mixfile do
 
   def project do
     [
-      app: :libgraph,
-      version: "0.16.1-mg.1",
+      app: :multigraph,
+      version: "0.16.1-mg.2",
       elixir: "~> 1.14",
       build_embedded: Mix.env() == :prod,
       start_permanent: Mix.env() == :prod,
