@@ -1,13 +1,13 @@
-defmodule Graph.Serializers.Flowchart do
+defmodule Multigraph.Serializers.Flowchart do
   @moduledoc """
-  This serializer converts a `Graph` to a [Mermaid Flowchart](https://mermaid.js.org/syntax/flowchart.html).
+  This serializer converts a `Multigraph` to a [Mermaid Flowchart](https://mermaid.js.org/syntax/flowchart.html).
   """
 
-  use Graph.Serializer
-  import Graph.Serializer
+  use Multigraph.Serializer
+  import Multigraph.Serializer
 
-  @impl Graph.Serializer
-  def serialize(%Graph{} = g) do
+  @impl Multigraph.Serializer
+  def serialize(%Multigraph{} = g) do
     result = """
     flowchart
     #{serialize_vertices(g)}

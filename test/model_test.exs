@@ -1,24 +1,24 @@
-defmodule Graph.Model.Test do
+defmodule Multigraph.ModelTest do
   use ExUnit.Case, async: true
   use ExUnitProperties
 
   @moduletag timeout: :infinity
 
-  property "a directed acyclic graph (DAG) is always acyclic" do
+  test "a directed acyclic graph (DAG) is always acyclic" do
     check all(g <- dag(), max_runs: 1000) do
-      Graph.is_acyclic?(g)
+      Multigraph.is_acyclic?(g)
     end
   end
 
-  property "a directed acyclic graph (DAG) is always topologically sortable" do
+  test "a directed acyclic graph (DAG) is always topologically sortable" do
     check all(g <- dag(), max_runs: 1000) do
-      assert Graph.topsort(g) != false
+      assert Multigraph.topsort(g) != false
     end
   end
 
-  property "a topsort of a DAG is correct if each element only has edges pointing to subsequent elements" do
-    check all(%Graph{vertices: vs, out_edges: oe} = g <- dag(), max_runs: 1000) do
-      sorted = Graph.topsort(g)
+  test "a topsort of a DAG is correct if each element only has edges pointing to subsequent elements" do
+    check all(%Multigraph{vertices: vs, out_edges: oe} = g <- dag(), max_runs: 1000) do
+      sorted = Multigraph.topsort(g)
 
       correct? =
         case sorted do
@@ -32,7 +32,7 @@ defmodule Graph.Model.Test do
                   res
 
                 v, {visited, _} ->
-                  v_id = Graph.Utils.vertex_id(v)
+                  v_id = Multigraph.Utils.vertex_id(v)
                   edges = Map.get(oe, v_id, MapSet.new())
 
                   backreferences? =
@@ -48,107 +48,107 @@ defmodule Graph.Model.Test do
     end
   end
 
-  property "a directed cyclic graph (DCG) is always cyclic" do
+  test "a directed cyclic graph (DCG) is always cyclic" do
     check all(g <- dcg(), max_runs: 1000) do
-      assert Graph.is_cyclic?(g)
+      assert Multigraph.is_cyclic?(g)
     end
   end
 
-  property "a directed cyclic graph (DCG) is never topologically sortable" do
+  test "a directed cyclic graph (DCG) is never topologically sortable" do
     check all(g <- dcg(), max_runs: 1000) do
-      assert Graph.topsort(g) == false
+      assert Multigraph.topsort(g) == false
     end
   end
 
-  property "the out degree of a vertex is equal to the number of out neighbors of that vertex (DAG)" do
+  test "the out degree of a vertex is equal to the number of out neighbors of that vertex (DAG)" do
     check all(g <- dag()) do
-      vs = Graph.vertices(g)
+      vs = Multigraph.vertices(g)
 
       assert Enum.reduce(vs, true, fn
                _, false ->
                  false
 
                v, _ ->
-                 Graph.out_degree(g, v) == length(Graph.out_neighbors(g, v))
+                 Multigraph.out_degree(g, v) == length(Multigraph.out_neighbors(g, v))
              end)
     end
   end
 
-  property "the in degree of a vertex is equal to the number of in neighbors of that vertex (DAG)" do
+  test "the in degree of a vertex is equal to the number of in neighbors of that vertex (DAG)" do
     check all(g <- dag()) do
-      vs = Graph.vertices(g)
+      vs = Multigraph.vertices(g)
 
       assert Enum.reduce(vs, true, fn
                _, false ->
                  false
 
                v, _ ->
-                 Graph.in_degree(g, v) == length(Graph.in_neighbors(g, v))
+                 Multigraph.in_degree(g, v) == length(Multigraph.in_neighbors(g, v))
              end)
     end
   end
 
-  property "the out degree of a vertex is equal to the number of out neighbors of that vertex (DCG)" do
+  test "the out degree of a vertex is equal to the number of out neighbors of that vertex (DCG)" do
     check all(g <- dcg()) do
-      vs = Graph.vertices(g)
+      vs = Multigraph.vertices(g)
 
       assert Enum.reduce(vs, true, fn
                _, false ->
                  false
 
                v, _ ->
-                 Graph.out_degree(g, v) == length(Graph.out_neighbors(g, v))
+                 Multigraph.out_degree(g, v) == length(Multigraph.out_neighbors(g, v))
              end)
     end
   end
 
-  property "the in degree of a vertex is equal to the number of in neighbors of that vertex (DCG)" do
+  test "the in degree of a vertex is equal to the number of in neighbors of that vertex (DCG)" do
     check all(g <- dcg()) do
-      vs = Graph.vertices(g)
+      vs = Multigraph.vertices(g)
 
       assert Enum.reduce(vs, true, fn
                _, false ->
                  false
 
                v, _ ->
-                 Graph.in_degree(g, v) == length(Graph.in_neighbors(g, v))
+                 Multigraph.in_degree(g, v) == length(Multigraph.in_neighbors(g, v))
              end)
     end
   end
 
-  property "the subgraph G' of a given graph G, implies that the vertices and edges of G' form subsets of those from G (DAG)" do
-    check all(g <- dag(), Graph.num_vertices(g) > 0) do
-      g_vertices = g |> Graph.vertices() |> MapSet.new()
-      g_edges = g |> Graph.edges() |> MapSet.new()
+  test "the subgraph G' of a given graph G, implies that the vertices and edges of G' form subsets of those from G (DAG)" do
+    check all(g <- dag(), Multigraph.num_vertices(g) > 0) do
+      g_vertices = g |> Multigraph.vertices() |> MapSet.new()
+      g_edges = g |> Multigraph.edges() |> MapSet.new()
 
       subset_vertices =
         g_vertices |> Enum.shuffle() |> Enum.take(:rand.uniform(MapSet.size(g_vertices) - 1))
 
-      sg = Graph.subgraph(g, subset_vertices)
-      sg_vertices = sg |> Graph.vertices() |> MapSet.new()
-      sg_edges = sg |> Graph.edges() |> MapSet.new()
+      sg = Multigraph.subgraph(g, subset_vertices)
+      sg_vertices = sg |> Multigraph.vertices() |> MapSet.new()
+      sg_edges = sg |> Multigraph.edges() |> MapSet.new()
       assert MapSet.subset?(sg_vertices, g_vertices) && MapSet.subset?(sg_edges, g_edges)
     end
   end
 
-  property "the subgraph G' of a given graph G, implies that the vertices and edges of G' form subsets of those from G (DCG)" do
+  test "the subgraph G' of a given graph G, implies that the vertices and edges of G' form subsets of those from G (DCG)" do
     check all(g <- dcg()) do
-      g_vertices = g |> Graph.vertices() |> MapSet.new()
-      g_edges = g |> Graph.edges() |> MapSet.new()
+      g_vertices = g |> Multigraph.vertices() |> MapSet.new()
+      g_edges = g |> Multigraph.edges() |> MapSet.new()
 
       subset_vertices =
         g_vertices |> Enum.shuffle() |> Enum.take(:rand.uniform(MapSet.size(g_vertices) - 1))
 
-      sg = Graph.subgraph(g, subset_vertices)
-      sg_vertices = sg |> Graph.vertices() |> MapSet.new()
-      sg_edges = sg |> Graph.edges() |> MapSet.new()
+      sg = Multigraph.subgraph(g, subset_vertices)
+      sg_vertices = sg |> Multigraph.vertices() |> MapSet.new()
+      sg_edges = sg |> Multigraph.edges() |> MapSet.new()
       assert MapSet.subset?(sg_vertices, g_vertices) && MapSet.subset?(sg_edges, g_edges)
     end
   end
 
-  property "connected components of a graph are lists of vertices where exists an adirectional path between each pair of vertices" do
-    check all(g <- dag(), Graph.num_vertices(g) > 0) do
-      components = Graph.components(g)
+  test "connected components of a graph are lists of vertices where exists an adirectional path between each pair of vertices" do
+    check all(g <- dag(), Multigraph.num_vertices(g) > 0) do
+      components = Multigraph.components(g)
 
       assert Enum.all?(components, fn
                component when length(component) < 2 ->
@@ -156,42 +156,42 @@ defmodule Graph.Model.Test do
 
                component ->
                  for j <- component, k <- component, j != k do
-                   Graph.get_shortest_path(g, j, k) != nil ||
-                     Graph.get_shortest_path(g, k, j) != nil
+                   Multigraph.get_shortest_path(g, j, k) != nil ||
+                     Multigraph.get_shortest_path(g, k, j) != nil
                  end
              end)
     end
   end
 
-  property "strongly connected components of a graph are lists of vertices where exits a bidirectional path between each pair of vertices" do
+  test "strongly connected components of a graph are lists of vertices where exits a bidirectional path between each pair of vertices" do
     check all(g <- dcg()) do
-      strong_components = Graph.strong_components(g)
+      strong_components = Multigraph.strong_components(g)
 
       assert Enum.all?(strong_components, fn
                component ->
                  for j <- component, k <- component, j != k do
-                   Graph.get_shortest_path(g, j, k) != nil &&
-                     Graph.get_shortest_path(g, j, k) != nil
+                   Multigraph.get_shortest_path(g, j, k) != nil &&
+                     Multigraph.get_shortest_path(g, j, k) != nil
                  end
              end)
     end
   end
 
-  property "the degeneracy core of a DAG is the maximum k_core of a given graph" do
+  test "the degeneracy core of a DAG is the maximum k_core of a given graph" do
     check all(g <- dag()) do
-      k_cores = Graph.k_core_components(g)
-      degeneracy = Graph.degeneracy(g)
-      degeneracy_core = g |> Graph.degeneracy_core() |> Graph.vertices()
+      k_cores = Multigraph.k_core_components(g)
+      degeneracy = Multigraph.degeneracy(g)
+      degeneracy_core = g |> Multigraph.degeneracy_core() |> Multigraph.vertices()
       {k, core} = Enum.max_by(k_cores, fn {k, _} -> k end)
       assert degeneracy == k and MapSet.equal?(MapSet.new(core), MapSet.new(degeneracy_core))
     end
   end
 
-  property "the degeneracy core of a DCG is the maximum k_core of a given graph" do
+  test "the degeneracy core of a DCG is the maximum k_core of a given graph" do
     check all(g <- dcg()) do
-      k_cores = Graph.k_core_components(g)
-      degeneracy = Graph.degeneracy(g)
-      degeneracy_core = g |> Graph.degeneracy_core() |> Graph.vertices()
+      k_cores = Multigraph.k_core_components(g)
+      degeneracy = Multigraph.degeneracy(g)
+      degeneracy_core = g |> Multigraph.degeneracy_core() |> Multigraph.vertices()
       {k, core} = Enum.max_by(k_cores, fn {k, _} -> k end)
       assert degeneracy == k and MapSet.equal?(MapSet.new(core), MapSet.new(degeneracy_core))
     end
@@ -200,11 +200,11 @@ defmodule Graph.Model.Test do
   ## Private
 
   def dag() do
-    filter(sized_dag(), &Graph.is_acyclic?/1)
+    filter(sized_dag(), &Multigraph.is_acyclic?/1)
   end
 
   defp sized_dag() do
-    sized(fn size -> sized_dag(size, Graph.new()) end)
+    sized(fn size -> sized_dag(size, Multigraph.new()) end)
   end
 
   defp sized_dag(0, g) do
@@ -213,7 +213,7 @@ defmodule Graph.Model.Test do
 
   defp sized_dag(i, g) do
     i = i + 1
-    g = Enum.reduce(0..i, g, fn v, g -> Graph.add_vertex(g, v) end)
+    g = Enum.reduce(0..i, g, fn v, g -> Multigraph.add_vertex(g, v) end)
 
     graph =
       Enum.reduce(1..i, g, fn v, g ->
@@ -224,7 +224,7 @@ defmodule Graph.Model.Test do
           v2s = Stream.iterate(Enum.random(r), fn _ -> Enum.random(r) end)
 
           Enum.reduce(Enum.take(v2s, :rand.uniform(6)), g, fn v2, acc ->
-            Graph.add_edge(acc, v, v2)
+            Multigraph.add_edge(acc, v, v2)
           end)
         end
       end)
@@ -233,11 +233,11 @@ defmodule Graph.Model.Test do
   end
 
   def dcg() do
-    filter(sized_dcg(), &Graph.is_cyclic?/1)
+    filter(sized_dcg(), &Multigraph.is_cyclic?/1)
   end
 
   defp sized_dcg() do
-    sized(fn size -> sized_dcg(size, Graph.new()) end)
+    sized(fn size -> sized_dcg(size, Multigraph.new()) end)
   end
 
   # We cannot produce a "real" DCG unless we have at least 2 vertices,
@@ -254,7 +254,7 @@ defmodule Graph.Model.Test do
   defp sized_dcg(1, g), do: constant(g)
 
   defp sized_dcg(i, g) do
-    g = Enum.reduce(0..i, g, fn v, g -> Graph.add_vertex(g, v) end)
+    g = Enum.reduce(0..i, g, fn v, g -> Multigraph.add_vertex(g, v) end)
 
     graph =
       Enum.reduce(0..i, g, fn v, g ->
@@ -263,20 +263,20 @@ defmodule Graph.Model.Test do
         Stream.iterate(Enum.random(r), fn _ -> Enum.random(r) end)
         |> Stream.filter(fn v2 -> v2 != v end)
         |> Enum.take(:rand.uniform(6))
-        |> Enum.reduce(g, fn v2, acc -> Graph.add_edge(acc, v, v2) end)
+        |> Enum.reduce(g, fn v2, acc -> Multigraph.add_edge(acc, v, v2) end)
       end)
 
     constant(graph)
   end
 
   def mesh() do
-    gen all(graph <- sized_mesh(), Graph.is_cyclic?(graph) and strongly_connected?(graph)) do
+    gen all(graph <- sized_mesh(), Multigraph.is_cyclic?(graph) and strongly_connected?(graph)) do
       graph
     end
   end
 
   defp sized_mesh() do
-    sized(fn size -> sized_mesh(size, Graph.new()) end)
+    sized(fn size -> sized_mesh(size, Multigraph.new()) end)
   end
 
   defp sized_mesh(size, g) when size < 2 do
@@ -284,8 +284,8 @@ defmodule Graph.Model.Test do
   end
 
   defp sized_mesh(size, g) do
-    g = Enum.reduce(0..size, g, fn v, g -> Graph.add_vertex(g, v) end)
-    vs = Graph.vertices(g)
+    g = Enum.reduce(0..size, g, fn v, g -> Multigraph.add_vertex(g, v) end)
+    vs = Multigraph.vertices(g)
 
     graph =
       Enum.reduce(vs, g, fn v, acc ->
@@ -294,7 +294,7 @@ defmodule Graph.Model.Test do
             acc2
 
           v2, acc2 ->
-            Graph.add_edge(acc2, v, v2)
+            Multigraph.add_edge(acc2, v, v2)
         end)
       end)
 
@@ -302,7 +302,7 @@ defmodule Graph.Model.Test do
   end
 
   defp strongly_connected?(graph) do
-    num_vertices = Graph.num_vertices(graph)
+    num_vertices = Multigraph.num_vertices(graph)
 
     Enum.reduce(graph.vertices, true, fn
       _, false ->

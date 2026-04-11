@@ -1,8 +1,8 @@
-defmodule Graph.Directed do
+defmodule Multigraph.Directed do
   @moduledoc false
   @compile {:inline, [in_neighbors: 2, in_neighbors: 3, out_neighbors: 2, out_neighbors: 3]}
 
-  def batch_topsort(%Graph{} = g) do
+  def batch_topsort(%Multigraph{} = g) do
     if is_acyclic?(g) do
       g
       |> topsort()
@@ -12,19 +12,19 @@ defmodule Graph.Directed do
     end
   end
 
-  defp do_batch_topsort([], acc, %Graph{}) do
+  defp do_batch_topsort([], acc, %Multigraph{}) do
     acc
   end
 
-  defp do_batch_topsort([next_vertex | rest_verticies], [], %Graph{} = g) do
+  defp do_batch_topsort([next_vertex | rest_verticies], [], %Multigraph{} = g) do
     do_batch_topsort(rest_verticies, [[next_vertex]], g)
   end
 
-  defp do_batch_topsort([next_vertex | rest_verticies], acc, %Graph{} = g) do
+  defp do_batch_topsort([next_vertex | rest_verticies], acc, %Multigraph{} = g) do
     batch_index =
       Enum.find_index(acc, fn vertex_batch ->
         Enum.all?(vertex_batch, fn check_vertex ->
-          Graph.dijkstra(g, check_vertex, next_vertex) == nil
+          Multigraph.dijkstra(g, check_vertex, next_vertex) == nil
         end)
       end)
 
@@ -38,7 +38,7 @@ defmodule Graph.Directed do
     do_batch_topsort(rest_verticies, updated_acc, g)
   end
 
-  def topsort(%Graph{vertices: vs} = g) do
+  def topsort(%Multigraph{vertices: vs} = g) do
     l = reverse_postorder(g)
 
     if length(forest(g, &in_neighbors/3, l)) == map_size(vs) do
@@ -48,25 +48,25 @@ defmodule Graph.Directed do
     end
   end
 
-  def preorder(%Graph{vertices: vs} = g) do
+  def preorder(%Multigraph{vertices: vs} = g) do
     g
     |> reverse_preorder()
     |> Stream.map(fn id -> Map.get(vs, id) end)
     |> Enum.reverse()
   end
 
-  def postorder(%Graph{vertices: vs} = g) do
+  def postorder(%Multigraph{vertices: vs} = g) do
     g
     |> reverse_postorder()
     |> Stream.map(fn id -> Map.get(vs, id) end)
     |> Enum.reverse()
   end
 
-  def is_arborescence?(%Graph{} = g) do
+  def is_arborescence?(%Multigraph{} = g) do
     arborescence_root(g) != nil
   end
 
-  def arborescence_root(%Graph{vertices: vs, out_edges: oe} = g) do
+  def arborescence_root(%Multigraph{vertices: vs, out_edges: oe} = g) do
     num_edges = Enum.reduce(oe, 0, fn {_, out}, sum -> sum + MapSet.size(out) end)
     num_vertices = map_size(vs)
 
@@ -88,11 +88,11 @@ defmodule Graph.Directed do
       nil
   end
 
-  def is_acyclic?(%Graph{} = g) do
+  def is_acyclic?(%Multigraph{} = g) do
     has_loops?(g) == false and topsort(g) != false
   end
 
-  def has_loops?(%Graph{vertices: vs} = g) do
+  def has_loops?(%Multigraph{vertices: vs} = g) do
     for {v_id, _} <- vs do
       if is_reflexive_vertex(g, v_id) do
         throw(:has_loop)
@@ -105,30 +105,30 @@ defmodule Graph.Directed do
       true
   end
 
-  def loop_vertices(%Graph{vertices: vs} = g) do
+  def loop_vertices(%Multigraph{vertices: vs} = g) do
     for {v_id, v} <- vs, is_reflexive_vertex(g, v_id), do: v
   end
 
-  def components(%Graph{vertices: vs} = g) do
+  def components(%Multigraph{vertices: vs} = g) do
     for component <- forest(g, &inout/3) do
       for id <- component, do: Map.get(vs, id)
     end
   end
 
-  def strong_components(%Graph{vertices: vs} = g) do
+  def strong_components(%Multigraph{vertices: vs} = g) do
     for component <- forest(g, &in_neighbors/3, reverse_postorder(g)) do
       for id <- component, do: Map.get(vs, id)
     end
   end
 
-  def reachable(%Graph{vertices: vertices, vertex_identifier: vertex_identifier} = g, vs)
+  def reachable(%Multigraph{vertices: vertices, vertex_identifier: vertex_identifier} = g, vs)
       when is_list(vs) do
     vs = Enum.map(vs, vertex_identifier)
     for id <- :lists.append(forest(g, &out_neighbors/3, vs, :first)), do: Map.get(vertices, id)
   end
 
   def reachable_neighbors(
-        %Graph{vertices: vertices, vertex_identifier: vertex_identifier} = g,
+        %Multigraph{vertices: vertices, vertex_identifier: vertex_identifier} = g,
         vs
       )
       when is_list(vs) do
@@ -138,48 +138,51 @@ defmodule Graph.Directed do
         do: Map.get(vertices, id)
   end
 
-  def reaching(%Graph{vertices: vertices, vertex_identifier: vertex_identifier} = g, vs)
+  def reaching(%Multigraph{vertices: vertices, vertex_identifier: vertex_identifier} = g, vs)
       when is_list(vs) do
     vs = Enum.map(vs, vertex_identifier)
     for id <- :lists.append(forest(g, &in_neighbors/3, vs, :first)), do: Map.get(vertices, id)
   end
 
-  def reaching_neighbors(%Graph{vertices: vertices, vertex_identifier: vertex_identifier} = g, vs)
+  def reaching_neighbors(
+        %Multigraph{vertices: vertices, vertex_identifier: vertex_identifier} = g,
+        vs
+      )
       when is_list(vs) do
     vs = Enum.map(vs, vertex_identifier)
     for id <- :lists.append(forest(g, &in_neighbors/3, vs, :not_first)), do: Map.get(vertices, id)
   end
 
-  def in_neighbors(%Graph{} = g, v, []) do
+  def in_neighbors(%Multigraph{} = g, v, []) do
     in_neighbors(g, v)
   end
 
-  def in_neighbors(%Graph{in_edges: ie}, v, vs) do
+  def in_neighbors(%Multigraph{in_edges: ie}, v, vs) do
     case Map.get(ie, v) do
       nil -> vs
       v_in -> MapSet.to_list(v_in) ++ vs
     end
   end
 
-  def in_neighbors(%Graph{in_edges: ie}, v) do
+  def in_neighbors(%Multigraph{in_edges: ie}, v) do
     case Map.get(ie, v) do
       nil -> []
       v_in -> MapSet.to_list(v_in)
     end
   end
 
-  def out_neighbors(%Graph{} = g, v, []) do
+  def out_neighbors(%Multigraph{} = g, v, []) do
     out_neighbors(g, v)
   end
 
-  def out_neighbors(%Graph{out_edges: oe}, v, vs) do
+  def out_neighbors(%Multigraph{out_edges: oe}, v, vs) do
     case Map.get(oe, v) do
       nil -> vs
       v_out -> MapSet.to_list(v_out) ++ vs
     end
   end
 
-  def out_neighbors(%Graph{out_edges: oe}, v) do
+  def out_neighbors(%Multigraph{out_edges: oe}, v) do
     case Map.get(oe, v) do
       nil -> []
       v_out -> MapSet.to_list(v_out)
@@ -192,7 +195,7 @@ defmodule Graph.Directed do
     Enum.member?(out_neighbors(g, v), v)
   end
 
-  defp forest(%Graph{vertices: vs} = g, fun) do
+  defp forest(%Multigraph{vertices: vs} = g, fun) do
     forest(g, fun, Map.keys(vs))
   end
 
@@ -237,7 +240,7 @@ defmodule Graph.Directed do
     :lists.append(forest(g, &out_neighbors/3))
   end
 
-  defp reverse_postorder(%Graph{vertices: vs} = g) do
+  defp reverse_postorder(%Multigraph{vertices: vs} = g) do
     {_, l} = posttraverse(Map.keys(vs), g, MapSet.new(), [])
     l
   end

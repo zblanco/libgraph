@@ -1,8 +1,8 @@
-defmodule Graph.UtilsTest do
+defmodule Multigraph.UtilsTest do
   use ExUnit.Case, async: true
 
   defp sizeof(term) do
-    Graph.Utils.sizeof(term)
+    Multigraph.Utils.sizeof(term)
   end
 
   test "sizeof/1" do

@@ -1,9 +1,9 @@
-defmodule Graph.Edge do
+defmodule Multigraph.Edge do
   @moduledoc """
   This module defines the struct used to represent edges and associated metadata about them.
 
   Used internally, `v1` and `v2` typically hold vertex ids, not the vertex itself, but all
-  public APIs which return `Graph.Edge` structs, return them with the actual vertices.
+  public APIs which return `Multigraph.Edge` structs, return them with the actual vertices.
   """
   defstruct v1: nil,
             v2: nil,
@@ -12,8 +12,8 @@ defmodule Graph.Edge do
             properties: %{}
 
   @type t :: %__MODULE__{
-          v1: Graph.vertex(),
-          v2: Graph.vertex(),
+          v1: Multigraph.vertex(),
+          v2: Multigraph.vertex(),
           weight: integer | float,
           label: term,
           properties: map
@@ -37,15 +37,15 @@ defmodule Graph.Edge do
 
   ## Examples
 
-      iex> edge = Graph.Edge.new(:a, :b, label: :foo, weight: 2, properties: %{color: "red"})
+      iex> edge = Multigraph.Edge.new(:a, :b, label: :foo, weight: 2, properties: %{color: "red"})
       ...> {edge.label, edge.weight, edge.properties}
       {:foo, 2, %{color: "red"}}
 
-      iex> Graph.new |> Graph.add_edge(Graph.Edge.new(:a, :b, weight: "1"))
+      iex> Multigraph.new |> Multigraph.add_edge(Multigraph.Edge.new(:a, :b, weight: "1"))
       ** (ArgumentError) invalid value for :weight, must be an integer
   """
-  @spec new(Graph.vertex(), Graph.vertex()) :: t
-  @spec new(Graph.vertex(), Graph.vertex(), [edge_opt]) :: t | no_return
+  @spec new(Multigraph.vertex(), Multigraph.vertex()) :: t
+  @spec new(Multigraph.vertex(), Multigraph.vertex(), [edge_opt]) :: t | no_return
   def new(v1, v2, opts \\ []) when is_list(opts) do
     {weight, opts} = Keyword.pop(opts, :weight, 1)
     {label, opts} = Keyword.pop(opts, :label)

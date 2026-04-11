@@ -1,8 +1,8 @@
-defmodule Graph.Reducers.Bfs do
+defmodule Multigraph.Reducers.Bfs do
   @moduledoc """
   This reducer traverses the graph using Breadth-First Search.
   """
-  use Graph.Reducer
+  use Multigraph.Reducer
 
   @doc """
   Performs a breadth-first traversal of the graph, applying the provided mapping function to
@@ -14,8 +14,8 @@ defmodule Graph.Reducers.Bfs do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_vertices([1, 2, 3, 4])
-      ...> g = Graph.add_edges(g, [{1, 3}, {1, 4}, {3, 2}, {2, 3}])
+      iex> g = Multigraph.new |> Multigraph.add_vertices([1, 2, 3, 4])
+      ...> g = Multigraph.add_edges(g, [{1, 3}, {1, 4}, {3, 2}, {2, 3}])
       ...> #{__MODULE__}.map(g, fn v -> v end)
       [1, 3, 4, 2]
   """
@@ -39,26 +39,26 @@ defmodule Graph.Reducers.Bfs do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_vertices([1, 2, 3, 4])
-      ...> g = Graph.add_edges(g, [{1, 3}, {1, 4}, {3, 2}, {2, 3}])
+      iex> g = Multigraph.new |> Multigraph.add_vertices([1, 2, 3, 4])
+      ...> g = Multigraph.add_edges(g, [{1, 3}, {1, 4}, {3, 2}, {2, 3}])
       ...> #{__MODULE__}.reduce(g, [], fn v, acc -> {:next, [v|acc]} end)
       [2, 4, 3, 1]
 
-      iex> g = Graph.new |> Graph.add_vertices([1, 2, 3, 4])
-      ...> g = Graph.add_edges(g, [{1, 3}, {1, 4}, {3, 2}, {2, 3}, {4, 5}])
+      iex> g = Multigraph.new |> Multigraph.add_vertices([1, 2, 3, 4])
+      ...> g = Multigraph.add_edges(g, [{1, 3}, {1, 4}, {3, 2}, {2, 3}, {4, 5}])
       ...> #{__MODULE__}.reduce(g, [], fn 5, acc -> {:skip, acc}; v, acc -> {:next, [v|acc]} end)
       [2, 4, 3, 1]
 
-      iex> g = Graph.new |> Graph.add_vertices([1, 2, 3, 4])
-      ...> g = Graph.add_edges(g, [{1, 3}, {1, 4}, {3, 2}, {2, 3}, {4, 5}])
+      iex> g = Multigraph.new |> Multigraph.add_vertices([1, 2, 3, 4])
+      ...> g = Multigraph.add_edges(g, [{1, 3}, {1, 4}, {3, 2}, {2, 3}, {4, 5}])
       ...> #{__MODULE__}.reduce(g, [], fn 4, acc -> {:halt, acc}; v, acc -> {:next, [v|acc]} end)
       [3, 1]
   """
-  def reduce(%Graph{} = g, acc, fun) when is_function(fun, 2) do
+  def reduce(%Multigraph{} = g, acc, fun) when is_function(fun, 2) do
     reduce(g, acc, fun, [])
   end
 
-  def reduce(%Graph{vertices: vs} = g, acc, fun, opts)
+  def reduce(%Multigraph{vertices: vs} = g, acc, fun, opts)
       when is_function(fun, 2) and is_list(opts) do
     partitions = partitions_from_opts(opts)
 
@@ -67,8 +67,8 @@ defmodule Graph.Reducers.Bfs do
     |> Stream.map(fn {id, _} -> {id, 0} end)
     # Only populate the initial queue with those vertices which have no inbound edges
     |> Stream.reject(fn {id, _cost} -> inbound_edges?(g, id, partitions) end)
-    |> Enum.reduce(PriorityQueue.new(), fn {id, cost}, q ->
-      PriorityQueue.push(q, id, cost)
+    |> Enum.reduce(Multigraph.PriorityQueue.new(), fn {id, cost}, q ->
+      Multigraph.PriorityQueue.push(q, id, cost)
     end)
     |> traverse(g, MapSet.new(), fun, acc, partitions)
   end
@@ -81,18 +81,18 @@ defmodule Graph.Reducers.Bfs do
     end
   end
 
-  defp inbound_edges?(%Graph{in_edges: ie}, v_id, _partitions) do
+  defp inbound_edges?(%Multigraph{in_edges: ie}, v_id, _partitions) do
     case Map.get(ie, v_id) do
       nil -> false
       edges -> MapSet.size(edges) > 0
     end
   end
 
-  defp out_neighbors(%Graph{out_edges: oe}, v_id, nil) do
+  defp out_neighbors(%Multigraph{out_edges: oe}, v_id, nil) do
     Map.get(oe, v_id, MapSet.new())
   end
 
-  defp out_neighbors(%Graph{out_edges: oe, edge_index: edge_index}, v_id, partitions) do
+  defp out_neighbors(%Multigraph{out_edges: oe, edge_index: edge_index}, v_id, partitions) do
     out_set = Map.get(oe, v_id, MapSet.new())
 
     partitions
@@ -109,15 +109,15 @@ defmodule Graph.Reducers.Bfs do
   end
 
   defp edge_weight_for(g, v_id, id, nil) do
-    Graph.Utils.edge_weight(g, v_id, id)
+    Multigraph.Utils.edge_weight(g, v_id, id)
   end
 
   defp edge_weight_for(g, v_id, id, partitions) do
-    Graph.Utils.edge_weight(g, v_id, id, partitions)
+    Multigraph.Utils.edge_weight(g, v_id, id, partitions)
   end
 
-  defp traverse(q, %Graph{vertices: vertices} = g, visited, fun, acc, partitions) do
-    case PriorityQueue.pop(q) do
+  defp traverse(q, %Multigraph{vertices: vertices} = g, visited, fun, acc, partitions) do
+    case Multigraph.PriorityQueue.pop(q) do
       {{:value, v_id}, q1} ->
         if MapSet.member?(visited, v_id) do
           traverse(q1, g, visited, fun, acc, partitions)
@@ -134,7 +134,7 @@ defmodule Graph.Reducers.Bfs do
                 |> MapSet.to_list()
                 |> Enum.reduce(q1, fn id, q ->
                   weight = edge_weight_for(g, v_id, id, partitions)
-                  PriorityQueue.push(q, id, weight)
+                  Multigraph.PriorityQueue.push(q, id, weight)
                 end)
 
               traverse(q2, g, visited, fun, acc2, partitions)

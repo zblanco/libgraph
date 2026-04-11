@@ -1,16 +1,16 @@
-defmodule Graph.Serializer do
+defmodule Multigraph.Serializer do
   @moduledoc """
   This module defines the Serializer behavior for graphs.
   """
-  @callback serialize(Graph.t()) :: {:ok, binary} | {:error, term}
+  @callback serialize(Multigraph.t()) :: {:ok, binary} | {:error, term}
 
   defmacro __using__(_) do
     quote do
-      @behaviour Graph.Serializer
+      @behaviour Multigraph.Serializer
     end
   end
 
-  def get_vertex_label(%Graph{vertex_labels: vl}, id, v) do
+  def get_vertex_label(%Multigraph{vertex_labels: vl}, id, v) do
     case Map.get(vl, id) do
       [] -> encode_label(v)
       label -> encode_label(label)

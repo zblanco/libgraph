@@ -1,15 +1,15 @@
-defmodule Graph do
+defmodule Multigraph do
   @moduledoc """
   This module defines a graph data structure, which supports directed and undirected graphs, in both acyclic and cyclic forms.
   It also defines the API for creating, manipulating, and querying that structure.
 
-  As far as memory usage is concerned, `Graph` should be fairly compact in memory, but if you want to do a rough
+  As far as memory usage is concerned, `Multigraph` should be fairly compact in memory, but if you want to do a rough
   comparison between the memory usage for a graph between `libgraph` and `digraph`, use `:digraph.info/1` and
-  `Graph.info/1` on the two graphs, and both results will contain memory usage information. Keep in mind we don't have a precise
+  `Multigraph.info/1` on the two graphs, and both results will contain memory usage information. Keep in mind we don't have a precise
   way to measure the memory usage of a term in memory, whereas ETS is able to give a more precise answer, but we do have
   a fairly good way to estimate the usage of a term, and we use that method within `libgraph`.
 
-  The Graph struct is structured like so:
+  The Multigraph struct is structured like so:
 
   - A map of vertex ids to vertices (`vertices`)
   - A map of vertex ids to their out neighbors (`out_edges`),
@@ -27,16 +27,16 @@ defmodule Graph do
 
   ## Multigraphs
 
-  When `multigraph: true` is passed to `Graph.new/1`, an edge adjacency index (`edge_index`) is maintained
+  When `multigraph: true` is passed to `Multigraph.new/1`, an edge adjacency index (`edge_index`) is maintained
   alongside the standard graph structure. This index partitions edges by a key derived from a `partition_by`
-  function (defaulting to `Graph.Utils.by_edge_label/1`, which partitions by edge label).
+  function (defaulting to `Multigraph.Utils.by_edge_label/1`, which partitions by edge label).
 
   The index structure is `%{partition_key => %{vertex_id => MapSet.t(edge_key)}}`, enabling O(1) map-access
   retrieval of edges by partition, avoiding O(E) scans over all edges.
 
   Query functions such as `edges/2`, `out_edges/3`, and `in_edges/3` accept `:by` and `:where` options
-  to filter edges by partition or predicate. Traversal and pathfinding algorithms (`Graph.Reducers.Bfs`,
-  `Graph.Reducers.Dfs`, `dijkstra/4`, `a_star/5`, `bellman_ford/3`) also accept a `:by` option to
+  to filter edges by partition or predicate. Traversal and pathfinding algorithms (`Multigraph.Reducers.Bfs`,
+  `Multigraph.Reducers.Dfs`, `dijkstra/4`, `a_star/5`, `bellman_ford/3`) also accept a `:by` option to
   restrict traversal to edges in specific partitions.
 
   ## Edge Properties
@@ -52,14 +52,14 @@ defmodule Graph do
             vertex_labels: %{},
             vertices: %{},
             type: :directed,
-            vertex_identifier: &Graph.Utils.vertex_id/1,
-            partition_by: &Graph.Utils.by_edge_label/1,
+            vertex_identifier: &Multigraph.Utils.vertex_id/1,
+            partition_by: &Multigraph.Utils.by_edge_label/1,
             multigraph: false
 
-  alias Graph.{Edge, EdgeSpecificationError}
+  alias Multigraph.{Edge, EdgeSpecificationError}
 
   @typedoc """
-  Identifier of a vertex. By default a non_neg_integer from `Graph.Utils.vertex_id/1` utilizing `:erlang.phash2`.
+  Identifier of a vertex. By default a non_neg_integer from `Multigraph.Utils.vertex_id/1` utilizing `:erlang.phash2`.
   """
   @type vertex_id :: non_neg_integer() | term()
   @type vertex :: term
@@ -96,12 +96,12 @@ defmodule Graph do
 
   - `type: :directed | :undirected`, specifies what type of graph this is. Defaults to a `:directed` graph.
   - `vertex_identifier`: a function which accepts a vertex and returns a unique identifier of said vertex.
-    Defaults to `Graph.Utils.vertex_id/1`, a hash of the whole vertex utilizing `:erlang.phash2/2`.
+    Defaults to `Multigraph.Utils.vertex_id/1`, a hash of the whole vertex utilizing `:erlang.phash2/2`.
   - `multigraph: true | false`, enables edge indexing for efficient partition-based edge retrieval.
       - When `true`, an `edge_index` is maintained that maps partition keys to sets of edge keys.
       - When `false` (default), no additional memory is used for the index.
   - `partition_by`: a function which accepts an `%Edge{}` and returns a list of unique identifiers used as the partition keys.
-    Defaults to `Graph.Utils.by_edge_label/1`, which partitions edges by the label when multigraphs are enabled.
+    Defaults to `Multigraph.Utils.by_edge_label/1`, which partitions edges by the label when multigraphs are enabled.
 
   ### Multigraph Edge Indexing
 
@@ -113,29 +113,29 @@ defmodule Graph do
 
   ## Example
 
-      iex> Graph.new()
-      #Graph<type: directed, vertices: [], edges: []>
+      iex> Multigraph.new()
+      #Multigraph<type: directed, vertices: [], edges: []>
 
-      iex> g = Graph.new(type: :undirected) |> Graph.add_edges([{:a, :b}, {:b, :a}])
-      ...> Graph.edges(g)
-      [%Graph.Edge{v1: :a, v2: :b}]
+      iex> g = Multigraph.new(type: :undirected) |> Multigraph.add_edges([{:a, :b}, {:b, :a}])
+      ...> Multigraph.edges(g)
+      [%Multigraph.Edge{v1: :a, v2: :b}]
 
-      iex> g = Graph.new(type: :directed) |> Graph.add_edges([{:a, :b}, {:b, :a}])
-      ...> Graph.edges(g)
-      [%Graph.Edge{v1: :a, v2: :b}, %Graph.Edge{v1: :b, v2: :a}]
+      iex> g = Multigraph.new(type: :directed) |> Multigraph.add_edges([{:a, :b}, {:b, :a}])
+      ...> Multigraph.edges(g)
+      [%Multigraph.Edge{v1: :a, v2: :b}, %Multigraph.Edge{v1: :b, v2: :a}]
 
-      iex> g = Graph.new(vertex_identifier: fn v -> :erlang.phash2(v) end) |> Graph.add_edges([{:a, :b}, {:b, :a}])
-      ...> Graph.edges(g)
-      [%Graph.Edge{v1: :a, v2: :b}, %Graph.Edge{v1: :b, v2: :a}]
+      iex> g = Multigraph.new(vertex_identifier: fn v -> :erlang.phash2(v) end) |> Multigraph.add_edges([{:a, :b}, {:b, :a}])
+      ...> Multigraph.edges(g)
+      [%Multigraph.Edge{v1: :a, v2: :b}, %Multigraph.Edge{v1: :b, v2: :a}]
 
-      iex> g = Graph.new(multigraph: true, partition_by: fn edge -> [edge.weight] end) |> Graph.add_edges([{:a, :b, weight: 1}, {:b, :a, weight: 2}])
-      ...> Graph.edges(g, by: 1)
-      [%Graph.Edge{v1: :a, v2: :b, weight: 1}]
+      iex> g = Multigraph.new(multigraph: true, partition_by: fn edge -> [edge.weight] end) |> Multigraph.add_edges([{:a, :b, weight: 1}, {:b, :a, weight: 2}])
+      ...> Multigraph.edges(g, by: 1)
+      [%Multigraph.Edge{v1: :a, v2: :b, weight: 1}]
   """
   def new(opts \\ []) do
     type = Keyword.get(opts, :type) || :directed
-    vertex_identifier = Keyword.get(opts, :vertex_identifier) || (&Graph.Utils.vertex_id/1)
-    partition_by = Keyword.get(opts, :partition_by) || (&Graph.Utils.by_edge_label/1)
+    vertex_identifier = Keyword.get(opts, :vertex_identifier) || (&Multigraph.Utils.vertex_id/1)
+    partition_by = Keyword.get(opts, :partition_by) || (&Multigraph.Utils.by_edge_label/1)
     multigraph = Keyword.get(opts, :multigraph, false)
 
     %__MODULE__{
@@ -154,9 +154,9 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c, :d])
-      ...> g = g |> Graph.add_edges([{:a, :b}, {:b, :c}])
-      ...> match?(%{type: :directed, num_vertices: 4, num_edges: 2}, Graph.info(g))
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c, :d])
+      ...> g = g |> Multigraph.add_edges([{:a, :b}, {:b, :c}])
+      ...> match?(%{type: :directed, num_vertices: 4, num_edges: 2}, Multigraph.info(g))
       true
   """
   @spec info(t) :: graph_info()
@@ -165,12 +165,12 @@ defmodule Graph do
       type: type,
       num_edges: num_edges(g),
       num_vertices: num_vertices(g),
-      size_in_bytes: Graph.Utils.sizeof(g)
+      size_in_bytes: Multigraph.Utils.sizeof(g)
     }
   end
 
   @doc """
-  Converts the given Graph to DOT format, which can then be converted to
+  Converts the given Multigraph to DOT format, which can then be converted to
   a number of other formats via Graphviz, e.g. `dot -Tpng out.dot > out.png`.
 
   If labels are set on a vertex, then those labels are used in the DOT output
@@ -193,12 +193,12 @@ defmodule Graph do
 
   ## Example
 
-      > g = Graph.new |> Graph.add_vertices([:a, :b, :c, :d])
-      > g = Graph.add_edges(g, [{:a, :b}, {:b, :c}, {:b, :d}, {:c, :d}])
-      > g = Graph.label_vertex(g, :a, :start)
-      > g = Graph.label_vertex(g, :d, :finish)
-      > g = Graph.update_edge(g, :b, :d, weight: 3)
-      > {:ok, dot} = Graph.to_dot(g)
+      > g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c, :d])
+      > g = Multigraph.add_edges(g, [{:a, :b}, {:b, :c}, {:b, :d}, {:c, :d}])
+      > g = Multigraph.label_vertex(g, :a, :start)
+      > g = Multigraph.label_vertex(g, :d, :finish)
+      > g = Multigraph.update_edge(g, :b, :d, weight: 3)
+      > {:ok, dot} = Multigraph.to_dot(g)
       > IO.puts(dot)
       strict digraph {
           97[label="start"]
@@ -213,17 +213,17 @@ defmodule Graph do
   """
   @spec to_dot(t) :: {:ok, binary} | {:error, term}
   def to_dot(%__MODULE__{} = g) do
-    Graph.Serializers.DOT.serialize(g)
+    Multigraph.Serializers.DOT.serialize(g)
   end
 
   @spec to_edgelist(t) :: {:ok, binary} | {:error, term}
   def to_edgelist(%__MODULE__{} = g) do
-    Graph.Serializers.Edgelist.serialize(g)
+    Multigraph.Serializers.Edgelist.serialize(g)
   end
 
   @spec to_flowchart(t) :: {:ok, binary} | {:error, term}
   def to_flowchart(%__MODULE__{} = g) do
-    Graph.Serializers.Flowchart.serialize(g)
+    Multigraph.Serializers.Flowchart.serialize(g)
   end
 
   @doc """
@@ -234,8 +234,8 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.add_edges(Graph.new, [{:a, :b}, {:b, :c}, {:a, :a}])
-      ...> Graph.num_edges(g)
+      iex> g = Multigraph.add_edges(Multigraph.new, [{:a, :b}, {:b, :c}, {:a, :a}])
+      ...> Multigraph.num_edges(g)
       3
   """
   @spec num_edges(t) :: non_neg_integer
@@ -252,8 +252,8 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.add_vertices(Graph.new, [:a, :b, :c])
-      ...> Graph.num_vertices(g)
+      iex> g = Multigraph.add_vertices(Multigraph.new, [:a, :b, :c])
+      ...> Multigraph.num_vertices(g)
       3
   """
   @spec num_vertices(t) :: non_neg_integer
@@ -289,20 +289,20 @@ defmodule Graph do
   """
   @spec is_arborescence?(t) :: boolean
   def is_arborescence?(%__MODULE__{type: :undirected}), do: false
-  def is_arborescence?(%__MODULE__{} = g), do: Graph.Directed.is_arborescence?(g)
+  def is_arborescence?(%__MODULE__{} = g), do: Multigraph.Directed.is_arborescence?(g)
 
   @doc """
   Returns the root vertex of the arborescence, if one exists, otherwise nil.
   """
   @spec arborescence_root(t) :: vertex | nil
   def arborescence_root(%__MODULE__{type: :undirected}), do: nil
-  def arborescence_root(%__MODULE__{} = g), do: Graph.Directed.arborescence_root(g)
+  def arborescence_root(%__MODULE__{} = g), do: Multigraph.Directed.arborescence_root(g)
 
   @doc """
   Returns true if and only if the graph `g` is acyclic.
   """
   @spec is_acyclic?(t) :: boolean
-  defdelegate is_acyclic?(g), to: Graph.Directed
+  defdelegate is_acyclic?(g), to: Multigraph.Directed
 
   @doc """
   Returns true if the graph `g` is not acyclic.
@@ -318,14 +318,14 @@ defmodule Graph do
 
   ## Example
 
-      iex> g1 = Graph.new |> Graph.add_vertices([:a, :b, :c, :d]) |> Graph.add_edge(:a, :b) |> Graph.add_edge(:b, :c)
-      ...> g2 = Graph.new |> Graph.add_vertices([:b, :c]) |> Graph.add_edge(:b, :c)
-      ...> Graph.is_subgraph?(g2, g1)
+      iex> g1 = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c, :d]) |> Multigraph.add_edge(:a, :b) |> Multigraph.add_edge(:b, :c)
+      ...> g2 = Multigraph.new |> Multigraph.add_vertices([:b, :c]) |> Multigraph.add_edge(:b, :c)
+      ...> Multigraph.is_subgraph?(g2, g1)
       true
 
-      iex> g1 = Graph.new |> Graph.add_vertices([:a, :b, :c, :d]) |> Graph.add_edges([{:a, :b}, {:b, :c}])
-      ...> g2 = Graph.new |> Graph.add_vertices([:b, :c, :e]) |> Graph.add_edges([{:b, :c}, {:c, :e}])
-      ...> Graph.is_subgraph?(g2, g1)
+      iex> g1 = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c, :d]) |> Multigraph.add_edges([{:a, :b}, {:b, :c}])
+      ...> g2 = Multigraph.new |> Multigraph.add_vertices([:b, :c, :e]) |> Multigraph.add_edges([{:b, :c}, {:c, :e}])
+      ...> Multigraph.is_subgraph?(g2, g1)
       false
   """
   @spec is_subgraph?(t, t) :: boolean
@@ -361,7 +361,7 @@ defmodule Graph do
   See `dijkstra/3`.
   """
   @spec get_shortest_path(t, vertex, vertex) :: [vertex] | nil
-  defdelegate get_shortest_path(g, a, b), to: Graph.Pathfinding, as: :dijkstra
+  defdelegate get_shortest_path(g, a, b), to: Multigraph.Pathfinding, as: :dijkstra
 
   @doc """
   Gets the shortest path between `a` and `b`.
@@ -374,17 +374,17 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_edges([{:a, :b}, {:b, :c}, {:c, :d}, {:b, :d}])
-      ...> Graph.dijkstra(g, :a, :d)
+      iex> g = Multigraph.new |> Multigraph.add_edges([{:a, :b}, {:b, :c}, {:c, :d}, {:b, :d}])
+      ...> Multigraph.dijkstra(g, :a, :d)
       [:a, :b, :d]
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c, :d])
-      ...> g = Graph.add_edges(g, [{:a, :c}, {:b, :c}, {:b, :d}])
-      ...> Graph.dijkstra(g, :a, :d)
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c, :d])
+      ...> g = Multigraph.add_edges(g, [{:a, :c}, {:b, :c}, {:b, :d}])
+      ...> Multigraph.dijkstra(g, :a, :d)
       nil
   """
   @spec dijkstra(t, vertex, vertex) :: [vertex] | nil
-  defdelegate dijkstra(g, a, b), to: Graph.Pathfinding
+  defdelegate dijkstra(g, a, b), to: Multigraph.Pathfinding
 
   @doc """
   Like `dijkstra/3`, but accepts options for multigraph partition filtering.
@@ -395,35 +395,36 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new(multigraph: true) |> Graph.add_edges([
+      iex> g = Multigraph.new(multigraph: true) |> Multigraph.add_edges([
       ...>   {:a, :b, label: :fast, weight: 1},
       ...>   {:a, :c, label: :slow, weight: 10},
       ...>   {:b, :d, label: :fast, weight: 1},
       ...>   {:c, :d, label: :slow, weight: 1}
       ...> ])
-      ...> Graph.dijkstra(g, :a, :d, by: :fast)
+      ...> Multigraph.dijkstra(g, :a, :d, by: :fast)
       [:a, :b, :d]
   """
   @spec dijkstra(t, vertex, vertex, keyword) :: [vertex] | nil
-  def dijkstra(g, a, b, opts) when is_list(opts), do: Graph.Pathfinding.dijkstra(g, a, b, opts)
+  def dijkstra(g, a, b, opts) when is_list(opts),
+    do: Multigraph.Pathfinding.dijkstra(g, a, b, opts)
 
   @doc """
   ## Example
 
-      iex> g = Graph.new |> Graph.add_edges([
+      iex> g = Multigraph.new |> Multigraph.add_edges([
       ...>   {:b, :c, weight: -2}, {:a, :b, weight: 1},
       ...>   {:c, :d, weight: 3}, {:b, :d, weight: 4}])
-      ...> Graph.bellman_ford(g, :a)
+      ...> Multigraph.bellman_ford(g, :a)
       %{a: 0, b: 1, c: -1, d: 2}
 
-      iex> g = Graph.new |> Graph.add_edges([
+      iex> g = Multigraph.new |> Multigraph.add_edges([
       ...>   {:b, :c, weight: -2}, {:a, :b, weight: -1},
       ...>   {:c, :d, weight: -3}, {:d, :a, weight: -5}])
-      ...> Graph.bellman_ford(g, :a)
+      ...> Multigraph.bellman_ford(g, :a)
       nil
   """
   @spec bellman_ford(t, vertex) :: [vertex]
-  defdelegate bellman_ford(g, a), to: Graph.Pathfinding
+  defdelegate bellman_ford(g, a), to: Multigraph.Pathfinding
 
   @doc """
   Like `bellman_ford/2`, but accepts options for multigraph partition filtering.
@@ -434,17 +435,18 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new(multigraph: true) |> Graph.add_edges([
+      iex> g = Multigraph.new(multigraph: true) |> Multigraph.add_edges([
       ...>   {:a, :b, label: :fast, weight: 1},
       ...>   {:b, :c, label: :fast, weight: 2},
       ...>   {:a, :c, label: :slow, weight: 100}
       ...> ])
-      ...> distances = Graph.bellman_ford(g, :a, by: :fast)
+      ...> distances = Multigraph.bellman_ford(g, :a, by: :fast)
       ...> distances[:c]
       3
   """
   @spec bellman_ford(t, vertex, keyword) :: [vertex]
-  def bellman_ford(g, a, opts) when is_list(opts), do: Graph.Pathfinding.bellman_ford(g, a, opts)
+  def bellman_ford(g, a, opts) when is_list(opts),
+    do: Multigraph.Pathfinding.bellman_ford(g, a, opts)
 
   @doc """
   Gets the shortest path between `a` and `b`.
@@ -460,17 +462,17 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_edges([{:a, :b}, {:b, :c}, {:c, :d}, {:b, :d}])
-      ...> Graph.a_star(g, :a, :d, fn _ -> 0 end)
+      iex> g = Multigraph.new |> Multigraph.add_edges([{:a, :b}, {:b, :c}, {:c, :d}, {:b, :d}])
+      ...> Multigraph.a_star(g, :a, :d, fn _ -> 0 end)
       [:a, :b, :d]
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c, :d])
-      ...> g = Graph.add_edges(g, [{:a, :c}, {:b, :c}, {:b, :d}])
-      ...> Graph.a_star(g, :a, :d, fn _ -> 0 end)
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c, :d])
+      ...> g = Multigraph.add_edges(g, [{:a, :c}, {:b, :c}, {:b, :d}])
+      ...> Multigraph.a_star(g, :a, :d, fn _ -> 0 end)
       nil
   """
   @spec a_star(t, vertex, vertex, (vertex, vertex -> integer)) :: [vertex]
-  defdelegate a_star(g, a, b, hfun), to: Graph.Pathfinding
+  defdelegate a_star(g, a, b, hfun), to: Multigraph.Pathfinding
 
   @doc """
   Like `a_star/4`, but accepts options for multigraph partition filtering.
@@ -481,18 +483,18 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new(multigraph: true) |> Graph.add_edges([
+      iex> g = Multigraph.new(multigraph: true) |> Multigraph.add_edges([
       ...>   {:a, :b, label: :fast, weight: 1},
       ...>   {:a, :c, label: :slow, weight: 10},
       ...>   {:b, :d, label: :fast, weight: 1},
       ...>   {:c, :d, label: :slow, weight: 1}
       ...> ])
-      ...> Graph.a_star(g, :a, :d, fn _ -> 0 end, by: :fast)
+      ...> Multigraph.a_star(g, :a, :d, fn _ -> 0 end, by: :fast)
       [:a, :b, :d]
   """
   @spec a_star(t, vertex, vertex, (vertex, vertex -> integer), keyword) :: [vertex]
   def a_star(g, a, b, hfun, opts) when is_list(opts),
-    do: Graph.Pathfinding.a_star(g, a, b, hfun, opts)
+    do: Multigraph.Pathfinding.a_star(g, a, b, hfun, opts)
 
   @doc """
   Builds a list of paths between vertex `a` and vertex `b`.
@@ -502,17 +504,17 @@ defmodule Graph do
   but not guaranteed to be in any meaningful order (i.e. shortest to longest).
 
   ## Example
-      iex> g = Graph.new |> Graph.add_edges([{:a, :b}, {:b, :c}, {:c, :d}, {:b, :d}, {:c, :a}])
-      ...> Graph.get_paths(g, :a, :d)
+      iex> g = Multigraph.new |> Multigraph.add_edges([{:a, :b}, {:b, :c}, {:c, :d}, {:b, :d}, {:c, :a}])
+      ...> Multigraph.get_paths(g, :a, :d)
       [[:a, :b, :c, :d], [:a, :b, :d]]
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c, :d])
-      ...> g = Graph.add_edges(g, [{:a, :c}, {:b, :c}, {:b, :d}])
-      ...> Graph.get_paths(g, :a, :d)
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c, :d])
+      ...> g = Multigraph.add_edges(g, [{:a, :c}, {:b, :c}, {:b, :d}])
+      ...> Multigraph.get_paths(g, :a, :d)
       []
   """
   @spec get_paths(t, vertex, vertex) :: [[vertex]]
-  defdelegate get_paths(g, a, b), to: Graph.Pathfinding, as: :all
+  defdelegate get_paths(g, a, b), to: Multigraph.Pathfinding, as: :all
 
   @doc """
   Return a list of all the edges, where each edge is expressed as a tuple
@@ -526,10 +528,10 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_vertex(:a) |> Graph.add_vertex(:b) |> Graph.add_vertex(:c)
-      ...> g = g |> Graph.add_edge(:a, :c) |> Graph.add_edge(:b, :c)
-      ...> Graph.edges(g) |> Enum.sort_by(& {&1.v1, &1.v2, &1.label})
-      [%Graph.Edge{v1: :a, v2: :c}, %Graph.Edge{v1: :b, v2: :c}]
+      iex> g = Multigraph.new |> Multigraph.add_vertex(:a) |> Multigraph.add_vertex(:b) |> Multigraph.add_vertex(:c)
+      ...> g = g |> Multigraph.add_edge(:a, :c) |> Multigraph.add_edge(:b, :c)
+      ...> Multigraph.edges(g) |> Enum.sort_by(& {&1.v1, &1.v2, &1.label})
+      [%Multigraph.Edge{v1: :a, v2: :c}, %Multigraph.Edge{v1: :b, v2: :c}]
 
   """
   @spec edges(t) :: [Edge.t()]
@@ -562,23 +564,23 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_edges([{:a, :b}, {:b, :c}])
-      ...> Graph.edges(g, :b) |> Enum.sort_by(& {&1.v1, &1.v2, &1.label})
-      [%Graph.Edge{v1: :a, v2: :b}, %Graph.Edge{v1: :b, v2: :c}]
+      iex> g = Multigraph.new |> Multigraph.add_edges([{:a, :b}, {:b, :c}])
+      ...> Multigraph.edges(g, :b) |> Enum.sort_by(& {&1.v1, &1.v2, &1.label})
+      [%Multigraph.Edge{v1: :a, v2: :b}, %Multigraph.Edge{v1: :b, v2: :c}]
 
-      iex> g = Graph.new |> Graph.add_edges([{:a, :b}, {:b, :c}])
-      ...> Graph.edges(g, :d)
+      iex> g = Multigraph.new |> Multigraph.add_edges([{:a, :b}, {:b, :c}])
+      ...> Multigraph.edges(g, :d)
       []
 
-      iex> g = Graph.new(multigraph: true) |> Graph.add_edges([{:a, :b}, {:b, :c}])
-      ...> g = Graph.add_edge(g, :a, :b, label: :contains)
-      ...> Graph.edges(g, :a, by: [:contains])
-      [%Graph.Edge{v1: :a, v2: :b, label: :contains}]
+      iex> g = Multigraph.new(multigraph: true) |> Multigraph.add_edges([{:a, :b}, {:b, :c}])
+      ...> g = Multigraph.add_edge(g, :a, :b, label: :contains)
+      ...> Multigraph.edges(g, :a, by: [:contains])
+      [%Multigraph.Edge{v1: :a, v2: :b, label: :contains}]
 
-      iex> g = Graph.new(multigraph: true) |> Graph.add_edges([{:a, :b}, {:b, :c}])
-      ...> g = Graph.add_edge(g, :a, :b, label: :contains, weight: 2)
-      ...> Graph.edges(g, :a, where: fn edge -> edge.weight == 2 end)
-      [%Graph.Edge{v1: :a, v2: :b, label: :contains, weight: 2}]
+      iex> g = Multigraph.new(multigraph: true) |> Multigraph.add_edges([{:a, :b}, {:b, :c}])
+      ...> g = Multigraph.add_edge(g, :a, :b, label: :contains, weight: 2)
+      ...> Multigraph.edges(g, :a, where: fn edge -> edge.weight == 2 end)
+      [%Multigraph.Edge{v1: :a, v2: :b, label: :contains, weight: 2}]
   """
   @spec edges(t, vertex | keyword()) :: [Edge.t()]
 
@@ -660,25 +662,25 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_edge(:a, :b, label: :uses)
-      ...> g = Graph.add_edge(g, :a, :b, label: :contains)
-      ...> Graph.edges(g, :a, :b) |> Enum.sort_by(& &1.label)
-      [%Graph.Edge{v1: :a, v2: :b, label: :contains}, %Graph.Edge{v1: :a, v2: :b, label: :uses}]
+      iex> g = Multigraph.new |> Multigraph.add_edge(:a, :b, label: :uses)
+      ...> g = Multigraph.add_edge(g, :a, :b, label: :contains)
+      ...> Multigraph.edges(g, :a, :b) |> Enum.sort_by(& &1.label)
+      [%Multigraph.Edge{v1: :a, v2: :b, label: :contains}, %Multigraph.Edge{v1: :a, v2: :b, label: :uses}]
 
-      iex> g = Graph.new(type: :undirected) |> Graph.add_edge(:a, :b, label: :uses)
-      ...> g = Graph.add_edge(g, :a, :b, label: :contains)
-      ...> Graph.edges(g, :a, :b) |> Enum.sort_by(& &1.label)
-      [%Graph.Edge{v1: :a, v2: :b, label: :contains}, %Graph.Edge{v1: :a, v2: :b, label: :uses}]
+      iex> g = Multigraph.new(type: :undirected) |> Multigraph.add_edge(:a, :b, label: :uses)
+      ...> g = Multigraph.add_edge(g, :a, :b, label: :contains)
+      ...> Multigraph.edges(g, :a, :b) |> Enum.sort_by(& &1.label)
+      [%Multigraph.Edge{v1: :a, v2: :b, label: :contains}, %Multigraph.Edge{v1: :a, v2: :b, label: :uses}]
 
-      iex> g = Graph.new(multigraph: true) |> Graph.add_edges([{:a, :b}, {:b, :c}])
-      ...> g = Graph.add_edge(g, :a, :b, label: :contains)
-      ...> Graph.edges(g, :a, by: :contains)
-      [%Graph.Edge{v1: :a, v2: :b, label: :contains}]
+      iex> g = Multigraph.new(multigraph: true) |> Multigraph.add_edges([{:a, :b}, {:b, :c}])
+      ...> g = Multigraph.add_edge(g, :a, :b, label: :contains)
+      ...> Multigraph.edges(g, :a, by: :contains)
+      [%Multigraph.Edge{v1: :a, v2: :b, label: :contains}]
 
-      iex> g = Graph.new(multigraph: true) |> Graph.add_edges([{:a, :b}, {:b, :c}])
-      ...> g = Graph.add_edge(g, :a, :b, label: :contains, weight: 2)
-      ...> Graph.edges(g, :a, by: :contains, where: fn edge -> edge.weight == 2 end)
-      [%Graph.Edge{v1: :a, v2: :b, label: :contains, weight: 2}]
+      iex> g = Multigraph.new(multigraph: true) |> Multigraph.add_edges([{:a, :b}, {:b, :c}])
+      ...> g = Multigraph.add_edge(g, :a, :b, label: :contains, weight: 2)
+      ...> Multigraph.edges(g, :a, by: :contains, where: fn edge -> edge.weight == 2 end)
+      [%Multigraph.Edge{v1: :a, v2: :b, label: :contains, weight: 2}]
   """
   @spec edges(t, vertex, vertex | keyword()) :: [Edge.t()]
   def edges(
@@ -829,21 +831,21 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_edges([{:a, :b}, {:a, :b, label: :contains}, {:a, :b, label: :uses}])
-      ...> Graph.edge(g, :b, :a)
+      iex> g = Multigraph.new |> Multigraph.add_edges([{:a, :b}, {:a, :b, label: :contains}, {:a, :b, label: :uses}])
+      ...> Multigraph.edge(g, :b, :a)
       nil
 
-      iex> g = Graph.new |> Graph.add_edges([{:a, :b}, {:a, :b, label: :contains}, {:a, :b, label: :uses}])
-      ...> Graph.edge(g, :a, :b)
-      %Graph.Edge{v1: :a, v2: :b}
+      iex> g = Multigraph.new |> Multigraph.add_edges([{:a, :b}, {:a, :b, label: :contains}, {:a, :b, label: :uses}])
+      ...> Multigraph.edge(g, :a, :b)
+      %Multigraph.Edge{v1: :a, v2: :b}
 
-      iex> g = Graph.new |> Graph.add_edges([{:a, :b}, {:a, :b, label: :contains}, {:a, :b, label: :uses}])
-      ...> Graph.edge(g, :a, :b, :contains)
-      %Graph.Edge{v1: :a, v2: :b, label: :contains}
+      iex> g = Multigraph.new |> Multigraph.add_edges([{:a, :b}, {:a, :b, label: :contains}, {:a, :b, label: :uses}])
+      ...> Multigraph.edge(g, :a, :b, :contains)
+      %Multigraph.Edge{v1: :a, v2: :b, label: :contains}
 
-      iex> g = Graph.new(type: :undirected) |> Graph.add_edges([{:a, :b}, {:a, :b, label: :contains}, {:a, :b, label: :uses}])
-      ...> Graph.edge(g, :a, :b, :contains)
-      %Graph.Edge{v1: :a, v2: :b, label: :contains}
+      iex> g = Multigraph.new(type: :undirected) |> Multigraph.add_edges([{:a, :b}, {:a, :b, label: :contains}, {:a, :b, label: :uses}])
+      ...> Multigraph.edge(g, :a, :b, :contains)
+      %Multigraph.Edge{v1: :a, v2: :b, label: :contains}
   """
   @spec edge(t, vertex, vertex) :: Edge.t() | nil
   @spec edge(t, vertex, vertex, label) :: Edge.t() | nil
@@ -892,8 +894,8 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_vertex(:a) |> Graph.add_vertex(:b)
-      ...> Graph.vertices(g)
+      iex> g = Multigraph.new |> Multigraph.add_vertex(:a) |> Multigraph.add_vertex(:b)
+      ...> Multigraph.vertices(g)
       [:a, :b]
   """
   @spec vertices(t) :: vertex
@@ -906,12 +908,12 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b])
-      ...> Graph.has_vertex?(g, :a)
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b])
+      ...> Multigraph.has_vertex?(g, :a)
       true
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b])
-      ...> Graph.has_vertex?(g, :c)
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b])
+      ...> Multigraph.has_vertex?(g, :c)
       false
   """
   @spec has_vertex?(t, vertex) :: boolean
@@ -926,8 +928,8 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_vertex(:a) |> Graph.label_vertex(:a, :my_label)
-      ...> Graph.vertex_labels(g, :a)
+      iex> g = Multigraph.new |> Multigraph.add_vertex(:a) |> Multigraph.label_vertex(:a, :my_label)
+      ...> Multigraph.vertex_labels(g, :a)
       [:my_label]
   """
   @spec vertex_labels(t, vertex) :: term | []
@@ -948,13 +950,13 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_vertex(:a, :mylabel) |> Graph.add_vertex(:a)
-      ...> [:a] = Graph.vertices(g)
-      ...> Graph.vertex_labels(g, :a)
+      iex> g = Multigraph.new |> Multigraph.add_vertex(:a, :mylabel) |> Multigraph.add_vertex(:a)
+      ...> [:a] = Multigraph.vertices(g)
+      ...> Multigraph.vertex_labels(g, :a)
       [:mylabel]
 
-      iex> g = Graph.new |> Graph.add_vertex(:a, [:mylabel, :other])
-      ...> Graph.vertex_labels(g, :a)
+      iex> g = Multigraph.new |> Multigraph.add_vertex(:a, [:mylabel, :other])
+      ...> Multigraph.vertex_labels(g, :a)
       [:mylabel, :other]
   """
   @spec add_vertex(t, vertex, label) :: t
@@ -986,8 +988,8 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :a])
-      ...> Graph.vertices(g)
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :a])
+      ...> Multigraph.vertices(g)
       [:a, :b]
   """
   @spec add_vertices(t, [vertex]) :: t
@@ -1002,15 +1004,15 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_vertex(:a, :foo)
-      ...> [:foo] = Graph.vertex_labels(g, :a)
-      ...> g = Graph.label_vertex(g, :a, :bar)
-      ...> Graph.vertex_labels(g, :a)
+      iex> g = Multigraph.new |> Multigraph.add_vertex(:a, :foo)
+      ...> [:foo] = Multigraph.vertex_labels(g, :a)
+      ...> g = Multigraph.label_vertex(g, :a, :bar)
+      ...> Multigraph.vertex_labels(g, :a)
       [:foo, :bar]
 
-      iex> g = Graph.new |> Graph.add_vertex(:a)
-      ...> g = Graph.label_vertex(g, :a, [:foo, :bar])
-      ...> Graph.vertex_labels(g, :a)
+      iex> g = Multigraph.new |> Multigraph.add_vertex(:a)
+      ...> g = Multigraph.label_vertex(g, :a, [:foo, :bar])
+      ...> Multigraph.vertex_labels(g, :a)
       [:foo, :bar]
   """
   @spec label_vertex(t, vertex, term) :: t | {:error, {:invalid_vertex, vertex}}
@@ -1037,15 +1039,15 @@ defmodule Graph do
   end
 
   @doc """
-    iex> graph = Graph.new |> Graph.add_vertex(:a, [:foo, :bar])
-    ...> [:foo, :bar] = Graph.vertex_labels(graph, :a)
-    ...> graph = Graph.remove_vertex_labels(graph, :a)
-    ...> Graph.vertex_labels(graph, :a)
+    iex> graph = Multigraph.new |> Multigraph.add_vertex(:a, [:foo, :bar])
+    ...> [:foo, :bar] = Multigraph.vertex_labels(graph, :a)
+    ...> graph = Multigraph.remove_vertex_labels(graph, :a)
+    ...> Multigraph.vertex_labels(graph, :a)
     []
 
-    iex> graph = Graph.new |> Graph.add_vertex(:a, [:foo, :bar])
-    ...> [:foo, :bar] = Graph.vertex_labels(graph, :a)
-    ...> Graph.remove_vertex_labels(graph, :b)
+    iex> graph = Multigraph.new |> Multigraph.add_vertex(:a, [:foo, :bar])
+    ...> [:foo, :bar] = Multigraph.vertex_labels(graph, :a)
+    ...> Multigraph.remove_vertex_labels(graph, :b)
     {:error, {:invalid_vertex, :b}}
   """
   @spec remove_vertex_labels(t, vertex) :: t | {:error, {:invalid_vertex, vertex}}
@@ -1074,20 +1076,20 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c, :d])
-      ...> g = Graph.add_edges(g, [{:a, :b}, {:b, :c}, {:c, :a}, {:c, :d}])
-      ...> Graph.vertices(g) |> Enum.sort()
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c, :d])
+      ...> g = Multigraph.add_edges(g, [{:a, :b}, {:b, :c}, {:c, :a}, {:c, :d}])
+      ...> Multigraph.vertices(g) |> Enum.sort()
       [:a, :b, :c, :d]
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c, :d])
-      ...> g = Graph.add_edges(g, [{:a, :b}, {:b, :c}, {:c, :a}, {:c, :d}])
-      ...> g = Graph.replace_vertex(g, :a, :e)
-      ...> Graph.vertices(g) |> Enum.sort()
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c, :d])
+      ...> g = Multigraph.add_edges(g, [{:a, :b}, {:b, :c}, {:c, :a}, {:c, :d}])
+      ...> g = Multigraph.replace_vertex(g, :a, :e)
+      ...> Multigraph.vertices(g) |> Enum.sort()
       [:b, :c, :d, :e]
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c, :d])
-      ...> g = Graph.add_edges(g, [{:a, :b}, {:b, :c}, {:c, :a}, {:c, :d}])
-      ...> g = Graph.replace_vertex(g, :a, :e)
-      ...> Graph.edges(g) |> Enum.sort_by(& {&1.v1, &1.v2, &1.label})
-      [%Graph.Edge{v1: :b, v2: :c}, %Graph.Edge{v1: :c, v2: :d}, %Graph.Edge{v1: :c, v2: :e}, %Graph.Edge{v1: :e, v2: :b}]
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c, :d])
+      ...> g = Multigraph.add_edges(g, [{:a, :b}, {:b, :c}, {:c, :a}, {:c, :d}])
+      ...> g = Multigraph.replace_vertex(g, :a, :e)
+      ...> Multigraph.edges(g) |> Enum.sort_by(& {&1.v1, &1.v2, &1.label})
+      [%Multigraph.Edge{v1: :b, v2: :c}, %Multigraph.Edge{v1: :c, v2: :d}, %Multigraph.Edge{v1: :c, v2: :e}, %Multigraph.Edge{v1: :e, v2: :b}]
   """
   @spec replace_vertex(t, vertex, vertex) :: t | {:error, :no_such_vertex}
   def replace_vertex(
@@ -1170,12 +1172,12 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_vertex(:a) |> Graph.add_vertex(:b) |> Graph.add_edge(:a, :b)
-      ...> [:a, :b] = Graph.vertices(g)
-      ...> [%Graph.Edge{v1: :a, v2: :b}] = Graph.edges(g)
-      ...> g = Graph.delete_vertex(g, :b)
-      ...> [:a] = Graph.vertices(g)
-      ...> Graph.edges(g)
+      iex> g = Multigraph.new |> Multigraph.add_vertex(:a) |> Multigraph.add_vertex(:b) |> Multigraph.add_edge(:a, :b)
+      ...> [:a, :b] = Multigraph.vertices(g)
+      ...> [%Multigraph.Edge{v1: :a, v2: :b}] = Multigraph.edges(g)
+      ...> g = Multigraph.delete_vertex(g, :b)
+      ...> [:a] = Multigraph.vertices(g)
+      ...> Multigraph.edges(g)
       []
   """
   @spec delete_vertex(t, vertex) :: t
@@ -1208,8 +1210,8 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c]) |> Graph.delete_vertices([:a, :b])
-      ...> Graph.vertices(g)
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c]) |> Multigraph.delete_vertices([:a, :b])
+      ...> Multigraph.vertices(g)
       [:c]
   """
   @spec delete_vertices(t, [vertex]) :: t
@@ -1218,15 +1220,15 @@ defmodule Graph do
   end
 
   @doc """
-  Like `add_edge/3` or `add_edge/4`, but takes a `Graph.Edge` struct created with
-  `Graph.Edge.new/2` or `Graph.Edge.new/3`.
+  Like `add_edge/3` or `add_edge/4`, but takes a `Multigraph.Edge` struct created with
+  `Multigraph.Edge.new/2` or `Multigraph.Edge.new/3`.
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_edge(Graph.Edge.new(:a, :b))
-      ...> [:a, :b] = Graph.vertices(g)
-      ...> Graph.edges(g)
-      [%Graph.Edge{v1: :a, v2: :b}]
+      iex> g = Multigraph.new |> Multigraph.add_edge(Multigraph.Edge.new(:a, :b))
+      ...> [:a, :b] = Multigraph.vertices(g)
+      ...> Multigraph.edges(g)
+      [%Multigraph.Edge{v1: :a, v2: :b}]
   """
   @spec add_edge(t, Edge.t()) :: t
   def add_edge(%__MODULE__{} = g, %Edge{
@@ -1249,15 +1251,15 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_edge(:a, :b)
-      ...> [:a, :b] = Graph.vertices(g)
-      ...> Graph.edges(g)
-      [%Graph.Edge{v1: :a, v2: :b, label: nil, weight: 1}]
+      iex> g = Multigraph.new |> Multigraph.add_edge(:a, :b)
+      ...> [:a, :b] = Multigraph.vertices(g)
+      ...> Multigraph.edges(g)
+      [%Multigraph.Edge{v1: :a, v2: :b, label: nil, weight: 1}]
 
-      iex> g = Graph.new |> Graph.add_edge(:a, :b, label: :foo, weight: 2)
-      ...> [:a, :b] = Graph.vertices(g)
-      ...> Graph.edges(g)
-      [%Graph.Edge{v1: :a, v2: :b, label: :foo, weight: 2}]
+      iex> g = Multigraph.new |> Multigraph.add_edge(:a, :b, label: :foo, weight: 2)
+      ...> [:a, :b] = Multigraph.vertices(g)
+      ...> Multigraph.edges(g)
+      [%Multigraph.Edge{v1: :a, v2: :b, label: :foo, weight: 2}]
   """
   @spec add_edge(t, vertex, vertex) :: t
   @spec add_edge(t, vertex, vertex, Edge.edge_opts()) :: t | no_return
@@ -1366,25 +1368,25 @@ defmodule Graph do
   Edges must be provided as a list of `Edge` structs, `{vertex, vertex}` pairs, or
   `{vertex, vertex, edge_opts :: [label: term, weight: integer, properties: map]}`.
 
-  See the docs for `Graph.Edge.new/2` or `Graph.Edge.new/3` for more info on creating Edge structs, and
+  See the docs for `Multigraph.Edge.new/2` or `Multigraph.Edge.new/3` for more info on creating Edge structs, and
   `add_edge/3` for information on edge options.
 
-  If an invalid edge specification is provided, raises `Graph.EdgeSpecificationError`.
+  If an invalid edge specification is provided, raises `Multigraph.EdgeSpecificationError`.
 
   ## Examples
 
-      iex> alias Graph.Edge
+      iex> alias Multigraph.Edge
       ...> edges = [Edge.new(:a, :b), Edge.new(:b, :c, weight: 2)]
-      ...> g = Graph.new |> Graph.add_vertices([:a, :b, :c]) |> Graph.add_edges(edges)
-      ...> Graph.edges(g) |> Enum.sort_by(& {&1.v1, &1.v2, &1.label})
-      [%Graph.Edge{v1: :a, v2: :b}, %Graph.Edge{v1: :b, v2: :c, weight: 2}]
+      ...> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c]) |> Multigraph.add_edges(edges)
+      ...> Multigraph.edges(g) |> Enum.sort_by(& {&1.v1, &1.v2, &1.label})
+      [%Multigraph.Edge{v1: :a, v2: :b}, %Multigraph.Edge{v1: :b, v2: :c, weight: 2}]
 
-      iex> g = Graph.new |> Graph.add_edges([{:a, :b}, {:a, :b, label: :foo}, {:a, :b, label: :foo, weight: 2}])
-      ...> Graph.edges(g) |> Enum.sort_by(& {&1.v1, &1.v2, &1.label})
-      [%Graph.Edge{v1: :a, v2: :b, label: :foo, weight: 2}, %Graph.Edge{v1: :a, v2: :b}]
+      iex> g = Multigraph.new |> Multigraph.add_edges([{:a, :b}, {:a, :b, label: :foo}, {:a, :b, label: :foo, weight: 2}])
+      ...> Multigraph.edges(g) |> Enum.sort_by(& {&1.v1, &1.v2, &1.label})
+      [%Multigraph.Edge{v1: :a, v2: :b, label: :foo, weight: 2}, %Multigraph.Edge{v1: :a, v2: :b}]
 
-      iex> Graph.new |> Graph.add_vertices([:a, :b, :c]) |> Graph.add_edges([:a, :b])
-      ** (Graph.EdgeSpecificationError) Expected a valid edge specification, but got: :a
+      iex> Multigraph.new |> Multigraph.add_vertices([:a, :b, :c]) |> Multigraph.add_edges([:a, :b])
+      ** (Multigraph.EdgeSpecificationError) Expected a valid edge specification, but got: :a
   """
   @spec add_edges(t, [Edge.t()] | Enumerable.t()) :: t | no_return
   def add_edges(%__MODULE__{} = g, es) do
@@ -1399,7 +1401,7 @@ defmodule Graph do
         add_edge(acc, v1, v2, opts)
 
       bad_edge, _acc ->
-        raise Graph.EdgeSpecificationError, bad_edge
+        raise Multigraph.EdgeSpecificationError, bad_edge
     end)
   end
 
@@ -1412,15 +1414,15 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :c]) |> Graph.add_edge(:a, :c, weight: 2)
-      ...> g = Graph.split_edge(g, :a, :c, :b)
-      ...> Graph.edges(g)
-      [%Graph.Edge{v1: :a, v2: :b, weight: 2}, %Graph.Edge{v1: :b, v2: :c, weight: 2}]
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :c]) |> Multigraph.add_edge(:a, :c, weight: 2)
+      ...> g = Multigraph.split_edge(g, :a, :c, :b)
+      ...> Multigraph.edges(g)
+      [%Multigraph.Edge{v1: :a, v2: :b, weight: 2}, %Multigraph.Edge{v1: :b, v2: :c, weight: 2}]
 
-      iex> g = Graph.new(type: :undirected) |> Graph.add_vertices([:a, :c]) |> Graph.add_edge(:a, :c, weight: 2)
-      ...> g = Graph.split_edge(g, :a, :c, :b)
-      ...> Graph.edges(g)
-      [%Graph.Edge{v1: :a, v2: :b, weight: 2}, %Graph.Edge{v1: :b, v2: :c, weight: 2}]
+      iex> g = Multigraph.new(type: :undirected) |> Multigraph.add_vertices([:a, :c]) |> Multigraph.add_edge(:a, :c, weight: 2)
+      ...> g = Multigraph.split_edge(g, :a, :c, :b)
+      ...> Multigraph.edges(g)
+      [%Multigraph.Edge{v1: :a, v2: :b, weight: 2}, %Multigraph.Edge{v1: :b, v2: :c, weight: 2}]
   """
   @spec split_edge(t, vertex, vertex, vertex) :: t | {:error, :no_such_edge}
   def split_edge(%__MODULE__{type: :undirected} = g, v1, v2, v3) do
@@ -1481,10 +1483,10 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_edge(:a, :b) |> Graph.add_edge(:a, :b, label: :bar)
-      ...> %Graph{} = g = Graph.update_edge(g, :a, :b, weight: 2, label: :foo)
-      ...> Graph.edges(g) |> Enum.sort_by(& &1.label)
-      [%Graph.Edge{v1: :a, v2: :b, label: :bar}, %Graph.Edge{v1: :a, v2: :b, label: :foo, weight: 2}]
+      iex> g = Multigraph.new |> Multigraph.add_edge(:a, :b) |> Multigraph.add_edge(:a, :b, label: :bar)
+      ...> %Multigraph{} = g = Multigraph.update_edge(g, :a, :b, weight: 2, label: :foo)
+      ...> Multigraph.edges(g) |> Enum.sort_by(& &1.label)
+      [%Multigraph.Edge{v1: :a, v2: :b, label: :bar}, %Multigraph.Edge{v1: :a, v2: :b, label: :foo, weight: 2}]
   """
   @spec update_edge(t, vertex, vertex, Edge.edge_opts()) :: t | {:error, :no_such_edge}
   def update_edge(%__MODULE__{} = g, v1, v2, opts) when is_list(opts) do
@@ -1498,15 +1500,15 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_edge(:a, :b) |> Graph.add_edge(:a, :b, label: :bar)
-      ...> %Graph{} = g = Graph.update_labelled_edge(g, :a, :b, :bar, weight: 2, label: :foo)
-      ...> Graph.edges(g) |> Enum.sort_by(& &1.label)
-      [%Graph.Edge{v1: :a, v2: :b, label: :foo, weight: 2}, %Graph.Edge{v1: :a, v2: :b}]
+      iex> g = Multigraph.new |> Multigraph.add_edge(:a, :b) |> Multigraph.add_edge(:a, :b, label: :bar)
+      ...> %Multigraph{} = g = Multigraph.update_labelled_edge(g, :a, :b, :bar, weight: 2, label: :foo)
+      ...> Multigraph.edges(g) |> Enum.sort_by(& &1.label)
+      [%Multigraph.Edge{v1: :a, v2: :b, label: :foo, weight: 2}, %Multigraph.Edge{v1: :a, v2: :b}]
 
-      iex> g = Graph.new(type: :undirected) |> Graph.add_edge(:a, :b) |> Graph.add_edge(:a, :b, label: :bar)
-      ...> %Graph{} = g = Graph.update_labelled_edge(g, :a, :b, :bar, weight: 2, label: :foo)
-      ...> Graph.edges(g) |> Enum.sort_by(& &1.label)
-      [%Graph.Edge{v1: :a, v2: :b, label: :foo, weight: 2}, %Graph.Edge{v1: :a, v2: :b}]
+      iex> g = Multigraph.new(type: :undirected) |> Multigraph.add_edge(:a, :b) |> Multigraph.add_edge(:a, :b, label: :bar)
+      ...> %Multigraph{} = g = Multigraph.update_labelled_edge(g, :a, :b, :bar, weight: 2, label: :foo)
+      ...> Multigraph.edges(g) |> Enum.sort_by(& &1.label)
+      [%Multigraph.Edge{v1: :a, v2: :b, label: :foo, weight: 2}, %Multigraph.Edge{v1: :a, v2: :b}]
   """
   @spec update_labelled_edge(t, vertex, vertex, label, Edge.edge_opts()) ::
           t | {:error, :no_such_edge}
@@ -1609,16 +1611,16 @@ defmodule Graph do
 
   ## Example
 
-    iex> g = Graph.new |> Graph.add_edges([{:a, :b}, {:a, :b, label: :foo}])
-    ...> g = Graph.delete_edge(g, :a, :b)
-    ...> [:a, :b] = Graph.vertices(g)
-    ...> Graph.edges(g)
+    iex> g = Multigraph.new |> Multigraph.add_edges([{:a, :b}, {:a, :b, label: :foo}])
+    ...> g = Multigraph.delete_edge(g, :a, :b)
+    ...> [:a, :b] = Multigraph.vertices(g)
+    ...> Multigraph.edges(g)
     []
 
-    iex> g = Graph.new(type: :undirected) |> Graph.add_edges([{:a, :b}, {:a, :b, label: :foo}])
-    ...> g = Graph.delete_edge(g, :a, :b)
-    ...> [:a, :b] = Graph.vertices(g)
-    ...> Graph.edges(g)
+    iex> g = Multigraph.new(type: :undirected) |> Multigraph.add_edges([{:a, :b}, {:a, :b, label: :foo}])
+    ...> g = Multigraph.delete_edge(g, :a, :b)
+    ...> [:a, :b] = Multigraph.vertices(g)
+    ...> Multigraph.edges(g)
     []
   """
   @spec delete_edge(t, vertex, vertex) :: t
@@ -1784,23 +1786,23 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_edges([{:a, :b}, {:a, :b, label: :foo}])
-      ...> g = Graph.delete_edge(g, :a, :b, nil)
-      ...> [:a, :b] = Graph.vertices(g)
-      ...> Graph.edges(g)
-      [%Graph.Edge{v1: :a, v2: :b, label: :foo}]
+      iex> g = Multigraph.new |> Multigraph.add_edges([{:a, :b}, {:a, :b, label: :foo}])
+      ...> g = Multigraph.delete_edge(g, :a, :b, nil)
+      ...> [:a, :b] = Multigraph.vertices(g)
+      ...> Multigraph.edges(g)
+      [%Multigraph.Edge{v1: :a, v2: :b, label: :foo}]
 
-      iex> g = Graph.new |> Graph.add_edges([{:a, :b}, {:a, :b, label: :foo}])
-      ...> g = Graph.delete_edge(g, :a, :b, :foo)
-      ...> [:a, :b] = Graph.vertices(g)
-      ...> Graph.edges(g)
-      [%Graph.Edge{v1: :a, v2: :b, label: nil}]
+      iex> g = Multigraph.new |> Multigraph.add_edges([{:a, :b}, {:a, :b, label: :foo}])
+      ...> g = Multigraph.delete_edge(g, :a, :b, :foo)
+      ...> [:a, :b] = Multigraph.vertices(g)
+      ...> Multigraph.edges(g)
+      [%Multigraph.Edge{v1: :a, v2: :b, label: nil}]
 
-      iex> g = Graph.new(type: :undirected) |> Graph.add_edges([{:a, :b}, {:a, :b, label: :foo}])
-      ...> g = Graph.delete_edge(g, :a, :b, :foo)
-      ...> [:a, :b] = Graph.vertices(g)
-      ...> Graph.edges(g)
-      [%Graph.Edge{v1: :a, v2: :b, label: nil}]
+      iex> g = Multigraph.new(type: :undirected) |> Multigraph.add_edges([{:a, :b}, {:a, :b, label: :foo}])
+      ...> g = Multigraph.delete_edge(g, :a, :b, :foo)
+      ...> [:a, :b] = Multigraph.vertices(g)
+      ...> Multigraph.edges(g)
+      [%Multigraph.Edge{v1: :a, v2: :b, label: nil}]
   """
   @spec delete_edge(t, vertex, vertex, label) :: t
   def delete_edge(%__MODULE__{type: :undirected} = g, v1, v2, label) do
@@ -1863,33 +1865,33 @@ defmodule Graph do
   edges from the graph, if they exist.
 
   Edge specifications can be `Edge` structs, `{vertex, vertex}` pairs, or `{vertex, vertex, label: label}`
-  triplets. An invalid specification will cause `Graph.EdgeSpecificationError` to be raised.
+  triplets. An invalid specification will cause `Multigraph.EdgeSpecificationError` to be raised.
 
   ## Examples
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c]) |> Graph.add_edge(:a, :b)
-      ...> g = Graph.delete_edges(g, [{:a, :b}])
-      ...> Graph.edges(g)
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c]) |> Multigraph.add_edge(:a, :b)
+      ...> g = Multigraph.delete_edges(g, [{:a, :b}])
+      ...> Multigraph.edges(g)
       []
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c]) |> Graph.add_edge(:a, :b, label: :foo)
-      ...> g = Graph.delete_edges(g, [{:a, :b}])
-      ...> Graph.edges(g)
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c]) |> Multigraph.add_edge(:a, :b, label: :foo)
+      ...> g = Multigraph.delete_edges(g, [{:a, :b}])
+      ...> Multigraph.edges(g)
       []
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c]) |> Graph.add_edge(:a, :b, label: :foo)
-      ...> g = Graph.delete_edges(g, [{:a, :b, label: :bar}])
-      ...> Graph.edges(g)
-      [%Graph.Edge{v1: :a, v2: :b, label: :foo}]
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c]) |> Multigraph.add_edge(:a, :b, label: :foo)
+      ...> g = Multigraph.delete_edges(g, [{:a, :b, label: :bar}])
+      ...> Multigraph.edges(g)
+      [%Multigraph.Edge{v1: :a, v2: :b, label: :foo}]
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c]) |> Graph.add_edge(:a, :b, label: :foo)
-      ...> g = Graph.delete_edges(g, [{:a, :b, label: :foo}])
-      ...> Graph.edges(g)
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c]) |> Multigraph.add_edge(:a, :b, label: :foo)
+      ...> g = Multigraph.delete_edges(g, [{:a, :b, label: :foo}])
+      ...> Multigraph.edges(g)
       []
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c]) |> Graph.add_edge(:a, :b)
-      ...> Graph.delete_edges(g, [:a])
-      ** (Graph.EdgeSpecificationError) Expected a valid edge specification, but got: :a
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c]) |> Multigraph.add_edge(:a, :b)
+      ...> Multigraph.delete_edges(g, [:a])
+      ** (Multigraph.EdgeSpecificationError) Expected a valid edge specification, but got: :a
   """
   @spec delete_edges(t, [{vertex, vertex}]) :: t | no_return
   def delete_edges(%__MODULE__{} = g, es) when is_list(es) do
@@ -1915,14 +1917,14 @@ defmodule Graph do
 
   ## Examples
 
-      iex> g = Graph.new |> Graph.add_edges([{:a, :b}, {:a, :b, label: :foo}, {:b, :a}])
-      ...> g = Graph.delete_edges(g, :a, :b)
-      ...> Graph.edges(g)
-      [%Graph.Edge{v1: :b, v2: :a}]
+      iex> g = Multigraph.new |> Multigraph.add_edges([{:a, :b}, {:a, :b, label: :foo}, {:b, :a}])
+      ...> g = Multigraph.delete_edges(g, :a, :b)
+      ...> Multigraph.edges(g)
+      [%Multigraph.Edge{v1: :b, v2: :a}]
 
-      iex> g = Graph.new(type: :undirected) |> Graph.add_edges([{:a, :b}, {:a, :b, label: :foo}, {:b, :a}])
-      ...> g = Graph.delete_edges(g, :a, :b)
-      ...> Graph.edges(g)
+      iex> g = Multigraph.new(type: :undirected) |> Multigraph.add_edges([{:a, :b}, {:a, :b, label: :foo}, {:b, :a}])
+      ...> g = Multigraph.delete_edges(g, :a, :b)
+      ...> Multigraph.edges(g)
       []
   """
   @spec delete_edges(t, vertex, vertex) :: t
@@ -1974,9 +1976,9 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c]) |> Graph.add_edge(:a, :b) |> Graph.add_edge(:b, :c)
-      ...> g |> Graph.transpose |> Graph.edges |> Enum.sort_by(& {&1.v1, &1.v2, &1.label})
-      [%Graph.Edge{v1: :b, v2: :a}, %Graph.Edge{v1: :c, v2: :b}]
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c]) |> Multigraph.add_edge(:a, :b) |> Multigraph.add_edge(:b, :c)
+      ...> g |> Multigraph.transpose |> Multigraph.edges |> Enum.sort_by(& {&1.v1, &1.v2, &1.label})
+      [%Multigraph.Edge{v1: :b, v2: :a}, %Multigraph.Edge{v1: :c, v2: :b}]
   """
   @spec transpose(t) :: t
   def transpose(
@@ -2018,19 +2020,19 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c, :d])
-      ...> g = Graph.add_edges(g, [{:a, :b}, {:a, :c}, {:b, :c}, {:c, :d}])
-      ...> Graph.topsort(g)
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c, :d])
+      ...> g = Multigraph.add_edges(g, [{:a, :b}, {:a, :c}, {:b, :c}, {:c, :d}])
+      ...> Multigraph.topsort(g)
       [:a, :b, :c, :d]
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c, :d])
-      ...> g = Graph.add_edges(g, [{:a, :b}, {:a, :c}, {:b, :c}, {:c, :d}, {:c, :a}])
-      ...> Graph.topsort(g)
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c, :d])
+      ...> g = Multigraph.add_edges(g, [{:a, :b}, {:a, :c}, {:b, :c}, {:c, :d}, {:c, :a}])
+      ...> Multigraph.topsort(g)
       false
   """
   @spec topsort(t) :: [vertex] | false
   def topsort(%__MODULE__{type: :undirected}), do: false
-  def topsort(%__MODULE__{} = g), do: Graph.Directed.topsort(g)
+  def topsort(%__MODULE__{} = g), do: Multigraph.Directed.topsort(g)
 
   @doc """
   Returns a batch topological ordering of the vertices of graph `g`, if such an ordering exists, otherwise it
@@ -2042,29 +2044,29 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c])
-      ...> g = Graph.add_edges(g, [{:a, :b}, {:a, :c}])
-      ...> Graph.batch_topsort(g)
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c])
+      ...> g = Multigraph.add_edges(g, [{:a, :b}, {:a, :c}])
+      ...> Multigraph.batch_topsort(g)
       [[:a], [:b, :c]]
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c, :d])
-      ...> g = Graph.add_edges(g, [{:a, :b}, {:a, :c}, {:b, :c}, {:c, :d}])
-      ...> Graph.batch_topsort(g)
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c, :d])
+      ...> g = Multigraph.add_edges(g, [{:a, :b}, {:a, :c}, {:b, :c}, {:c, :d}])
+      ...> Multigraph.batch_topsort(g)
       [[:a], [:b], [:c], [:d]]
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c, :d, :x, :y, :z])
-      ...> g = Graph.add_edges(g, [{:a, :b}, {:a, :c}, {:c, :d}, {:x, :y}, {:x, :z}])
-      ...> Graph.batch_topsort(g)
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c, :d, :x, :y, :z])
+      ...> g = Multigraph.add_edges(g, [{:a, :b}, {:a, :c}, {:c, :d}, {:x, :y}, {:x, :z}])
+      ...> Multigraph.batch_topsort(g)
       [[:a, :x], [:b, :c, :y, :z], [:d]]
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c, :d, :x, :y, :z])
-      ...> g = Graph.add_edges(g, [{:a, :b}, {:a, :c}, {:b, :c}, {:c, :d}, {:c, :a}])
-      ...> Graph.batch_topsort(g)
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c, :d, :x, :y, :z])
+      ...> g = Multigraph.add_edges(g, [{:a, :b}, {:a, :c}, {:b, :c}, {:c, :d}, {:c, :a}])
+      ...> Multigraph.batch_topsort(g)
       false
   """
   @spec batch_topsort(t) :: [vertex] | false
   def batch_topsort(%__MODULE__{type: :undirected}), do: false
-  def batch_topsort(%__MODULE__{} = g), do: Graph.Directed.batch_topsort(g)
+  def batch_topsort(%__MODULE__{} = g), do: Multigraph.Directed.batch_topsort(g)
 
   @doc """
   Returns a list of connected components, where each component is a list of vertices.
@@ -2079,13 +2081,13 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c, :d])
-      ...> g = Graph.add_edges(g, [{:a, :b}, {:a, :c}, {:b, :c}, {:c, :d}, {:c, :a}])
-      ...> Graph.components(g)
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c, :d])
+      ...> g = Multigraph.add_edges(g, [{:a, :b}, {:a, :c}, {:b, :c}, {:c, :d}, {:c, :a}])
+      ...> Multigraph.components(g)
       [[:d, :b, :c, :a]]
   """
   @spec components(t) :: [[vertex]]
-  defdelegate components(g), to: Graph.Directed
+  defdelegate components(g), to: Multigraph.Directed
 
   @doc """
   Returns a list of strongly connected components, where each component is a list of vertices.
@@ -2097,13 +2099,13 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c, :d])
-      ...> g = Graph.add_edges(g, [{:a, :b}, {:a, :c}, {:b, :c}, {:c, :d}, {:c, :a}])
-      ...> Graph.strong_components(g)
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c, :d])
+      ...> g = Multigraph.add_edges(g, [{:a, :b}, {:a, :c}, {:b, :c}, {:c, :d}, {:c, :a}])
+      ...> Multigraph.strong_components(g)
       [[:d], [:b, :c, :a]]
   """
   @spec strong_components(t) :: [[vertex]]
-  defdelegate strong_components(g), to: Graph.Directed
+  defdelegate strong_components(g), to: Multigraph.Directed
 
   @doc """
   Returns an unsorted list of vertices from the graph, such that for each vertex in the list (call it `v`),
@@ -2113,13 +2115,13 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c, :d])
-      ...> g = Graph.add_edges(g, [{:a, :b}, {:a, :c}, {:b, :c}, {:c, :d}])
-      ...> Graph.reachable(g, [:a])
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c, :d])
+      ...> g = Multigraph.add_edges(g, [{:a, :b}, {:a, :c}, {:b, :c}, {:c, :d}])
+      ...> Multigraph.reachable(g, [:a])
       [:d, :c, :b, :a]
   """
   @spec reachable(t, [vertex]) :: [[vertex]]
-  defdelegate reachable(g, vs), to: Graph.Directed
+  defdelegate reachable(g, vs), to: Multigraph.Directed
 
   @doc """
   Returns an unsorted list of vertices from the graph, such that for each vertex in the list (call it `v`),
@@ -2129,13 +2131,13 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c, :d])
-      ...> g = Graph.add_edges(g, [{:a, :b}, {:a, :c}, {:b, :c}, {:c, :d}])
-      ...> Graph.reachable_neighbors(g, [:a])
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c, :d])
+      ...> g = Multigraph.add_edges(g, [{:a, :b}, {:a, :c}, {:b, :c}, {:c, :d}])
+      ...> Multigraph.reachable_neighbors(g, [:a])
       [:d, :c, :b]
   """
   @spec reachable_neighbors(t, [vertex]) :: [[vertex]]
-  defdelegate reachable_neighbors(g, vs), to: Graph.Directed
+  defdelegate reachable_neighbors(g, vs), to: Multigraph.Directed
 
   @doc """
   Returns an unsorted list of vertices from the graph, such that for each vertex in the list (call it `v`),
@@ -2145,13 +2147,13 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c, :d])
-      ...> g = Graph.add_edges(g, [{:a, :b}, {:a, :c}, {:b, :c}, {:c, :d}])
-      ...> Graph.reaching(g, [:d])
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c, :d])
+      ...> g = Multigraph.add_edges(g, [{:a, :b}, {:a, :c}, {:b, :c}, {:c, :d}])
+      ...> Multigraph.reaching(g, [:d])
       [:b, :a, :c, :d]
   """
   @spec reaching(t, [vertex]) :: [[vertex]]
-  defdelegate reaching(g, vs), to: Graph.Directed
+  defdelegate reaching(g, vs), to: Multigraph.Directed
 
   @doc """
   Returns an unsorted list of vertices from the graph, such that for each vertex in the list (call it `v`),
@@ -2161,13 +2163,13 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c, :d])
-      ...> g = Graph.add_edges(g, [{:a, :b}, {:a, :c}, {:b, :c}, {:c, :a}, {:b, :d}])
-      ...> Graph.reaching_neighbors(g, [:b])
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c, :d])
+      ...> g = Multigraph.add_edges(g, [{:a, :b}, {:a, :c}, {:b, :c}, {:c, :a}, {:b, :d}])
+      ...> Multigraph.reaching_neighbors(g, [:b])
       [:b, :c, :a]
   """
   @spec reaching_neighbors(t, [vertex]) :: [[vertex]]
-  defdelegate reaching_neighbors(g, vs), to: Graph.Directed
+  defdelegate reaching_neighbors(g, vs), to: Multigraph.Directed
 
   @doc """
   Returns all vertices of graph `g`. The order is given by a depth-first traversal of the graph,
@@ -2185,13 +2187,13 @@ defmodule Graph do
            /
          :e
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c, :d, :e])
-      ...> g = Graph.add_edges(g, [{:a, :b}, {:b, :c}, {:b, :d}, {:c, :e}])
-      ...> Graph.preorder(g)
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c, :d, :e])
+      ...> g = Multigraph.add_edges(g, [{:a, :b}, {:b, :c}, {:b, :d}, {:c, :e}])
+      ...> Multigraph.preorder(g)
       [:a, :b, :c, :e, :d]
   """
   @spec preorder(t) :: [vertex]
-  defdelegate preorder(g), to: Graph.Directed
+  defdelegate preorder(g), to: Multigraph.Directed
 
   @doc """
   Returns all vertices of graph `g`. The order is given by a depth-first traversal of the graph,
@@ -2211,25 +2213,25 @@ defmodule Graph do
           /
          :e
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c, :d, :e])
-      ...> g = Graph.add_edges(g, [{:a, :b}, {:b, :c}, {:b, :d}, {:c, :e}])
-      ...> Graph.postorder(g)
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c, :d, :e])
+      ...> g = Multigraph.add_edges(g, [{:a, :b}, {:b, :c}, {:b, :d}, {:c, :e}])
+      ...> Multigraph.postorder(g)
       [:e, :c, :d, :b, :a]
   """
   @spec postorder(t) :: [vertex]
-  defdelegate postorder(g), to: Graph.Directed
+  defdelegate postorder(g), to: Multigraph.Directed
 
   @doc """
   Returns a list of vertices from graph `g` which are included in a loop, where a loop is a cycle of length 1.
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c]) |> Graph.add_edge(:a, :a)
-      ...> Graph.loop_vertices(g)
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c]) |> Multigraph.add_edge(:a, :a)
+      ...> Multigraph.loop_vertices(g)
       [:a]
   """
   @spec loop_vertices(t) :: [vertex]
-  defdelegate loop_vertices(g), to: Graph.Directed
+  defdelegate loop_vertices(g), to: Multigraph.Directed
 
   @doc """
   Detects all maximal cliques in the provided graph.
@@ -2300,10 +2302,10 @@ defmodule Graph do
   Calculates the k-core for a given graph and value of `k`.
 
   A k-core of the graph is a maximal subgraph of `g` which contains vertices of which all
-  have a degree of at least `k`. This function returns a new `Graph` which is a subgraph
+  have a degree of at least `k`. This function returns a new `Multigraph` which is a subgraph
   of `g` containing all vertices which have a coreness >= the desired value of `k`.
 
-  If there is no k-core in the graph for the provided value of `k`, an empty `Graph` is returned.
+  If there is no k-core in the graph for the provided value of `k`, an empty `Multigraph` is returned.
 
   If a negative integer is provided for `k`, a RuntimeError will be raised.
 
@@ -2320,7 +2322,7 @@ defmodule Graph do
       |> Stream.filter(fn {_, vk} -> vk >= k end)
       |> Enum.map(fn {v, _k} -> v end)
 
-    Graph.subgraph(g, vs)
+    Multigraph.subgraph(g, vs)
   end
 
   def k_core(%__MODULE__{}, k) do
@@ -2339,10 +2341,10 @@ defmodule Graph do
 
       k_core_vertices =
         g
-        |> Graph.k_core_components()
+        |> Multigraph.k_core_components()
         |> Stream.filter(fn {k, _} -> k >= desired_k end)
         |> Enum.flat_map(fn {_, vs} -> vs end)
-      Graph.subgraph(g, k_core_vertices)
+      Multigraph.subgraph(g, k_core_vertices)
   """
   @spec k_core_components(t) :: %{(k :: non_neg_integer) => [vertex]}
   def k_core_components(%__MODULE__{} = g) do
@@ -2389,7 +2391,7 @@ defmodule Graph do
       |> Enum.group_by(fn {_, k} -> k end, fn {v, _} -> v end)
       |> Enum.max_by(fn {k, _} -> k end, fn -> {0, []} end)
 
-    Graph.subgraph(g, core)
+    Multigraph.subgraph(g, core)
   end
 
   @doc """
@@ -2485,12 +2487,12 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new(type: :undirected) |> Graph.add_vertices([:a, :b, :c]) |> Graph.add_edge(:a, :b)
-      ...> Graph.degree(g, :b)
+      iex> g = Multigraph.new(type: :undirected) |> Multigraph.add_vertices([:a, :b, :c]) |> Multigraph.add_edge(:a, :b)
+      ...> Multigraph.degree(g, :b)
       1
 
-      iex> g = Graph.new() |> Graph.add_vertices([:a, :b, :c]) |> Graph.add_edge(:a, :b)
-      ...> Graph.degree(g, :b)
+      iex> g = Multigraph.new() |> Multigraph.add_vertices([:a, :b, :c]) |> Multigraph.add_edge(:a, :b)
+      ...> Multigraph.degree(g, :b)
       1
   """
   @spec degree(t, vertex) :: non_neg_integer
@@ -2512,8 +2514,8 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c]) |> Graph.add_edge(:a, :b)
-      ...> Graph.in_degree(g, :b)
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c]) |> Multigraph.add_edge(:a, :b)
+      ...> Multigraph.in_degree(g, :b)
       1
   """
   def in_degree(
@@ -2566,8 +2568,8 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_vertices([:a, :b, :c]) |> Graph.add_edge(:a, :b)
-      ...> Graph.out_degree(g, :a)
+      iex> g = Multigraph.new |> Multigraph.add_vertices([:a, :b, :c]) |> Multigraph.add_edge(:a, :b)
+      ...> Multigraph.out_degree(g, :a)
       1
   """
   @spec out_degree(t, vertex) :: non_neg_integer
@@ -2593,12 +2595,12 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_edges([{:a, :b}, {:b, :a}, {:b, :c}, {:c, :a}])
-      ...> Graph.neighbors(g, :a)
+      iex> g = Multigraph.new |> Multigraph.add_edges([{:a, :b}, {:b, :a}, {:b, :c}, {:c, :a}])
+      ...> Multigraph.neighbors(g, :a)
       [:b, :c]
 
-      iex> g = Graph.new |> Graph.add_edges([{:a, :b}, {:b, :a}, {:b, :c}, {:c, :a}])
-      ...> Graph.neighbors(g, :d)
+      iex> g = Multigraph.new |> Multigraph.add_edges([{:a, :b}, {:b, :a}, {:b, :c}, {:c, :a}])
+      ...> Multigraph.neighbors(g, :d)
       []
   """
   @spec neighbors(t, vertex) :: [vertex]
@@ -2625,8 +2627,8 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_edges([{:a, :b}, {:a, :b, label: :foo}, {:b, :c}])
-      ...> Graph.in_neighbors(g, :b)
+      iex> g = Multigraph.new |> Multigraph.add_edges([{:a, :b}, {:a, :b, label: :foo}, {:b, :c}])
+      ...> Multigraph.in_neighbors(g, :b)
       [:a]
   """
   @spec in_neighbors(t, vertex) :: [vertex]
@@ -2647,15 +2649,15 @@ defmodule Graph do
   end
 
   @doc """
-  Returns a list of `Graph.Edge` structs representing the in edges to vertex `v`.
+  Returns a list of `Multigraph.Edge` structs representing the in edges to vertex `v`.
 
   In the case of undirected graphs, it delegates to `edges/2`.
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_edges([{:a, :b}, {:a, :b, label: :foo}, {:b, :c}])
-      ...> Graph.in_edges(g, :b) |> Enum.sort_by(& &1.label)
-      [%Graph.Edge{v1: :a, v2: :b, label: :foo}, %Graph.Edge{v1: :a, v2: :b}]
+      iex> g = Multigraph.new |> Multigraph.add_edges([{:a, :b}, {:a, :b, label: :foo}, {:b, :c}])
+      ...> Multigraph.in_edges(g, :b) |> Enum.sort_by(& &1.label)
+      [%Multigraph.Edge{v1: :a, v2: :b, label: :foo}, %Multigraph.Edge{v1: :a, v2: :b}]
   """
   @spec in_edges(t, vertex) :: Edge.t()
   def in_edges(%__MODULE__{type: :undirected} = g, v) do
@@ -2689,16 +2691,16 @@ defmodule Graph do
   end
 
   @doc """
-  Returns a list of `Graph.Edge` structs representing the in edges to vertex `v`,
+  Returns a list of `Multigraph.Edge` structs representing the in edges to vertex `v`,
   filtered by the given partition.
 
   Only available when `multigraph: true`.
 
   ## Example
 
-      iex> g = Graph.new(multigraph: true) |> Graph.add_edges([{:a, :b, label: :foo}, {:a, :b, label: :bar}])
-      ...> Graph.in_edges(g, :b, by: :foo)
-      [%Graph.Edge{v1: :a, v2: :b, label: :foo}]
+      iex> g = Multigraph.new(multigraph: true) |> Multigraph.add_edges([{:a, :b, label: :foo}, {:a, :b, label: :bar}])
+      ...> Multigraph.in_edges(g, :b, by: :foo)
+      [%Multigraph.Edge{v1: :a, v2: :b, label: :foo}]
   """
   @spec in_edges(t, vertex, [{:by, term}]) :: [Edge.t()]
   def in_edges(
@@ -2757,8 +2759,8 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_edges([{:a, :b}, {:a, :b, label: :foo}, {:b, :c}])
-      ...> Graph.out_neighbors(g, :a)
+      iex> g = Multigraph.new |> Multigraph.add_edges([{:a, :b}, {:a, :b, label: :foo}, {:b, :c}])
+      ...> Multigraph.out_neighbors(g, :a)
       [:b]
   """
   @spec out_neighbors(t, vertex) :: [vertex]
@@ -2779,15 +2781,15 @@ defmodule Graph do
   end
 
   @doc """
-  Returns a list of `Graph.Edge` structs representing the out edges from vertex `v`.
+  Returns a list of `Multigraph.Edge` structs representing the out edges from vertex `v`.
 
   In the case of undirected graphs, it delegates to `edges/2`.
 
   ## Example
 
-      iex> g = Graph.new |> Graph.add_edges([{:a, :b}, {:a, :b, label: :foo}, {:b, :c}])
-      ...> Graph.out_edges(g, :a) |> Enum.sort_by(& &1.label)
-      [%Graph.Edge{v1: :a, v2: :b, label: :foo}, %Graph.Edge{v1: :a, v2: :b}]
+      iex> g = Multigraph.new |> Multigraph.add_edges([{:a, :b}, {:a, :b, label: :foo}, {:b, :c}])
+      ...> Multigraph.out_edges(g, :a) |> Enum.sort_by(& &1.label)
+      [%Multigraph.Edge{v1: :a, v2: :b, label: :foo}, %Multigraph.Edge{v1: :a, v2: :b}]
   """
   @spec out_edges(t, vertex) :: Edge.t()
   def out_edges(%__MODULE__{type: :undirected} = g, v) do
@@ -2822,7 +2824,7 @@ defmodule Graph do
   end
 
   @doc """
-  Returns a list of `Graph.Edge` structs representing the out edges from vertex `v`,
+  Returns a list of `Multigraph.Edge` structs representing the out edges from vertex `v`,
   filtered by multigraph options.
 
   Only available when `multigraph: true`.
@@ -2834,15 +2836,15 @@ defmodule Graph do
 
   ## Example
 
-      iex> g = Graph.new(multigraph: true) |> Graph.add_edges([{:a, :b, label: :foo}, {:a, :b, label: :bar}, {:a, :c}])
-      ...> Graph.out_edges(g, :a, by: :foo)
-      [%Graph.Edge{v1: :a, v2: :b, label: :foo}]
+      iex> g = Multigraph.new(multigraph: true) |> Multigraph.add_edges([{:a, :b, label: :foo}, {:a, :b, label: :bar}, {:a, :c}])
+      ...> Multigraph.out_edges(g, :a, by: :foo)
+      [%Multigraph.Edge{v1: :a, v2: :b, label: :foo}]
 
-      iex> g = Graph.new(multigraph: true) |> Graph.add_edges([{:a, :b, label: :foo, weight: 5}, {:a, :b, label: :bar}])
-      ...> Graph.out_edges(g, :a, by: :foo, where: fn e -> e.weight > 1 end)
-      [%Graph.Edge{v1: :a, v2: :b, label: :foo, weight: 5}]
+      iex> g = Multigraph.new(multigraph: true) |> Multigraph.add_edges([{:a, :b, label: :foo, weight: 5}, {:a, :b, label: :bar}])
+      ...> Multigraph.out_edges(g, :a, by: :foo, where: fn e -> e.weight > 1 end)
+      [%Multigraph.Edge{v1: :a, v2: :b, label: :foo, weight: 5}]
   """
-  @spec out_edges(Graph.t(), any(), [{:by, any()}, ...]) :: list()
+  @spec out_edges(Multigraph.t(), any(), [{:by, any()}, ...]) :: list()
   def out_edges(%__MODULE__{multigraph: true} = g, v, opts)
       when is_list(opts) do
     where_fun = opts[:where]
@@ -2959,14 +2961,14 @@ defmodule Graph do
 
     Enum.reduce(
       allowed,
-      Graph.new(type: type, multigraph: multigraph, partition_by: partition_by),
+      Multigraph.new(type: type, multigraph: multigraph, partition_by: partition_by),
       fn v_id, sg ->
         v = Map.get(vertices, v_id)
 
         sg =
           sg
-          |> Graph.add_vertex(v)
-          |> Graph.label_vertex(v, Graph.vertex_labels(graph, v))
+          |> Multigraph.add_vertex(v)
+          |> Multigraph.label_vertex(v, Multigraph.vertex_labels(graph, v))
 
         oe
         |> Map.get(v_id, MapSet.new())
@@ -2979,7 +2981,7 @@ defmodule Graph do
           Enum.reduce(Map.get(meta, edge_key), sg, fn {label, weight}, sg ->
             props = get_edge_props(graph.edge_properties, edge_key, label)
 
-            Graph.add_edge(sg, v, v2,
+            Multigraph.add_edge(sg, v, v2,
               label: label,
               weight: weight,
               properties: props

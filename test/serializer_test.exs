@@ -1,4 +1,4 @@
-defmodule Graph.SerializerTests do
+defmodule Multigraph.SerializerTests do
   use ExUnit.Case, async: true
 
   test "to_dot/1" do
@@ -16,13 +16,13 @@ defmodule Graph.SerializerTests do
                 98 -> 100 [label=1.0; weight=3]
                 99 -> 100 [weight=1]
             }
-            """} = Graph.to_dot(g)
+            """} = Multigraph.to_dot(g)
   end
 
   test "to_edgelist" do
     g = kitchen_sink_graph()
 
-    {:ok, actual} = Graph.to_edgelist(g)
+    {:ok, actual} = Multigraph.to_edgelist(g)
 
     expected = """
     "start" "{:complex, :label}"
@@ -37,7 +37,7 @@ defmodule Graph.SerializerTests do
   test "to_flowchart" do
     g = kitchen_sink_graph()
 
-    {:ok, actual} = Graph.to_flowchart(g)
+    {:ok, actual} = Multigraph.to_flowchart(g)
 
     expected = """
     flowchart
@@ -55,12 +55,17 @@ defmodule Graph.SerializerTests do
   end
 
   defp kitchen_sink_graph do
-    Graph.new()
-    |> Graph.add_vertices([:a, :b, :c, :d])
-    |> Graph.add_edges([{:a, :b, weight: 3}, {:b, :c, label: 5}, {:b, :d, label: 1.0}, {:c, :d}])
-    |> Graph.label_vertex(:a, :start)
-    |> Graph.label_vertex(:b, {:complex, :label})
-    |> Graph.label_vertex(:d, "finish")
-    |> Graph.update_labelled_edge(:b, :d, 1.0, weight: 3)
+    Multigraph.new()
+    |> Multigraph.add_vertices([:a, :b, :c, :d])
+    |> Multigraph.add_edges([
+      {:a, :b, weight: 3},
+      {:b, :c, label: 5},
+      {:b, :d, label: 1.0},
+      {:c, :d}
+    ])
+    |> Multigraph.label_vertex(:a, :start)
+    |> Multigraph.label_vertex(:b, {:complex, :label})
+    |> Multigraph.label_vertex(:d, "finish")
+    |> Multigraph.update_labelled_edge(:b, :d, 1.0, weight: 3)
   end
 end

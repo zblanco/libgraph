@@ -1,4 +1,4 @@
-defmodule PriorityQueue do
+defmodule Multigraph.PriorityQueue do
   @moduledoc """
   This module defines a priority queue datastructure, intended for use with graphs, as it prioritizes
   lower priority values over higher priority values (ideal for priorities based on edge weights, etc.).
@@ -29,17 +29,17 @@ defmodule PriorityQueue do
 
   ## Example
 
-      iex> pq = PriorityQueue.new
-      ...> pq = PriorityQueue.push(pq, :foo, 1)
-      ...> {result, _} = PriorityQueue.pop(pq)
+      iex> pq = Multigraph.PriorityQueue.new
+      ...> pq = Multigraph.PriorityQueue.push(pq, :foo, 1)
+      ...> {result, _} = Multigraph.PriorityQueue.pop(pq)
       ...> result
       {:value, :foo}
 
-      iex> pq = PriorityQueue.new
-      ...> pq = PriorityQueue.push(pq, :foo, 1)
-      ...> {{:value, :foo}, pq} = PriorityQueue.pop(pq)
-      ...> pq = PriorityQueue.push(pq, :bar, 1)
-      ...> {result, _} = PriorityQueue.pop(pq)
+      iex> pq = Multigraph.PriorityQueue.new
+      ...> pq = Multigraph.PriorityQueue.push(pq, :foo, 1)
+      ...> {{:value, :foo}, pq} = Multigraph.PriorityQueue.pop(pq)
+      ...> pq = Multigraph.PriorityQueue.push(pq, :bar, 1)
+      ...> {result, _} = Multigraph.PriorityQueue.pop(pq)
       ...> result
       {:value, :bar}
   """
@@ -67,9 +67,9 @@ defmodule PriorityQueue do
 
   ## Example
 
-      iex> pq = PriorityQueue.new |> PriorityQueue.push(:foo, 1)
-      ...> {:value, :foo} = PriorityQueue.peek(pq)
-      ...> {{:value, val}, _} = PriorityQueue.pop(pq)
+      iex> pq = Multigraph.PriorityQueue.new |> Multigraph.PriorityQueue.push(:foo, 1)
+      ...> {:value, :foo} = Multigraph.PriorityQueue.peek(pq)
+      ...> {{:value, val}, _} = Multigraph.PriorityQueue.pop(pq)
       ...> val
       :foo
   """
@@ -87,22 +87,22 @@ defmodule PriorityQueue do
   @doc """
   Pops an element from the queue with the lowest integer value priority.
 
-  Returns `{:empty, PriorityQueue.t}` if there are no elements left to dequeue.
+  Returns `{:empty, Multigraph.PriorityQueue.t}` if there are no elements left to dequeue.
 
-  Returns `{{:value, term}, PriorityQueue.t}` if the dequeue is successful
+  Returns `{{:value, term}, Multigraph.PriorityQueue.t}` if the dequeue is successful
 
   This is equivalent to the `extract-min` operation described in priority queue theory.
 
   ## Example
 
-      iex> pq = PriorityQueue.new
-      ...> pq = Enum.reduce(Enum.shuffle(0..4), pq, fn i, pq -> PriorityQueue.push(pq, ?a+i, i) end)
-      ...> {{:value, ?a}, pq} = PriorityQueue.pop(pq)
-      ...> {{:value, ?b}, pq} = PriorityQueue.pop(pq)
-      ...> {{:value, ?c}, pq} = PriorityQueue.pop(pq)
-      ...> {{:value, ?d}, pq} = PriorityQueue.pop(pq)
-      ...> {{:value, ?e}, pq} = PriorityQueue.pop(pq)
-      ...> {result, _} = PriorityQueue.pop(pq)
+      iex> pq = Multigraph.PriorityQueue.new
+      ...> pq = Enum.reduce(Enum.shuffle(0..4), pq, fn i, pq -> Multigraph.PriorityQueue.push(pq, ?a+i, i) end)
+      ...> {{:value, ?a}, pq} = Multigraph.PriorityQueue.pop(pq)
+      ...> {{:value, ?b}, pq} = Multigraph.PriorityQueue.pop(pq)
+      ...> {{:value, ?c}, pq} = Multigraph.PriorityQueue.pop(pq)
+      ...> {{:value, ?d}, pq} = Multigraph.PriorityQueue.pop(pq)
+      ...> {{:value, ?e}, pq} = Multigraph.PriorityQueue.pop(pq)
+      ...> {result, _} = Multigraph.PriorityQueue.pop(pq)
       ...> result
       :empty
   """
@@ -124,7 +124,7 @@ defmodule PriorityQueue do
   end
 
   defimpl Inspect do
-    def inspect(%PriorityQueue{priorities: tree}, opts) do
+    def inspect(%Multigraph.PriorityQueue{priorities: tree}, opts) do
       if :gb_trees.size(tree) > 0 do
         items =
           tree
@@ -133,9 +133,9 @@ defmodule PriorityQueue do
 
         count = Enum.count(items)
         doc = Inspect.Algebra.to_doc(items, opts)
-        Inspect.Algebra.concat(["#PriorityQueue<size: #{count}, queue: ", doc, ">"])
+        Inspect.Algebra.concat(["#Multigraph.PriorityQueue<size: #{count}, queue: ", doc, ">"])
       else
-        "#PriorityQueue<size: 0, queue: []>"
+        "#Multigraph.PriorityQueue<size: 0, queue: []>"
       end
     end
   end

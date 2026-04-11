@@ -1,4 +1,4 @@
-defmodule Graph.Utils do
+defmodule Multigraph.Utils do
   @moduledoc false
   @compile {:inline, [{:vertex_id, 1}, {:edge_weight, 3}, {:edge_weight, 4}]}
 
@@ -81,13 +81,13 @@ defmodule Graph.Utils do
     sizeof_tuple(term, i + 1, n, size + sizeof_term(:erlang.element(i, term)))
   end
 
-  def edge_weight(%Graph{type: :directed, edges: meta}, a, b) do
+  def edge_weight(%Multigraph{type: :directed, edges: meta}, a, b) do
     Map.fetch!(meta, {a, b})
     |> Enum.map(fn {_label, weight} -> weight end)
     |> Enum.min()
   end
 
-  def edge_weight(%Graph{type: :undirected, edges: meta}, a, b) do
+  def edge_weight(%Multigraph{type: :undirected, edges: meta}, a, b) do
     case Map.get(meta, {a, b}) do
       nil ->
         case Map.get(meta, {b, a}) do
@@ -108,7 +108,12 @@ defmodule Graph.Utils do
   end
 
   def edge_weight(
-        %Graph{type: :directed, edges: meta, partition_by: partition_by, edge_properties: ep},
+        %Multigraph{
+          type: :directed,
+          edges: meta,
+          partition_by: partition_by,
+          edge_properties: ep
+        },
         a,
         b,
         partitions
@@ -123,7 +128,12 @@ defmodule Graph.Utils do
   end
 
   def edge_weight(
-        %Graph{type: :undirected, edges: meta, partition_by: partition_by, edge_properties: ep},
+        %Multigraph{
+          type: :undirected,
+          edges: meta,
+          partition_by: partition_by,
+          edge_properties: ep
+        },
         a,
         b,
         partitions

@@ -1,4 +1,4 @@
-defmodule Graph.Multigraph.Model.Test do
+defmodule Multigraph.MultigraphModelTest do
   use ExUnit.Case, async: true
   use ExUnitProperties
 
@@ -6,9 +6,9 @@ defmodule Graph.Multigraph.Model.Test do
 
   @labels [:foo, :bar, :baz, :qux, nil]
 
-  property "edge_index is complete: every edge is indexed under its partitions" do
+  test "edge_index is complete: every edge is indexed under its partitions" do
     check all(g <- multigraph(), max_runs: 500) do
-      for edge <- Graph.edges(g) do
+      for edge <- Multigraph.edges(g) do
         partitions = g.partition_by.(edge)
         v1_id = g.vertex_identifier.(edge.v1)
         v2_id = g.vertex_identifier.(edge.v2)
@@ -29,7 +29,7 @@ defmodule Graph.Multigraph.Model.Test do
     end
   end
 
-  property "edge_index is sound: every indexed edge_key exists in edges" do
+  test "edge_index is sound: every indexed edge_key exists in edges" do
     check all(g <- multigraph(), max_runs: 500) do
       for {_partition, vertex_map} <- g.edge_index,
           {_v_id, edge_keys} <- vertex_map,
@@ -40,14 +40,14 @@ defmodule Graph.Multigraph.Model.Test do
     end
   end
 
-  property "partition filter returns exactly matching edges" do
+  test "partition filter returns exactly matching edges" do
     check all(g <- multigraph(), max_runs: 500) do
       for label <- @labels do
-        indexed = Graph.edges(g, by: [label])
+        indexed = Multigraph.edges(g, by: [label])
 
         scanned =
           g
-          |> Graph.edges()
+          |> Multigraph.edges()
           |> Enum.filter(fn edge ->
             label in g.partition_by.(edge)
           end)
@@ -58,41 +58,41 @@ defmodule Graph.Multigraph.Model.Test do
     end
   end
 
-  property "index invariant holds after delete_edge" do
+  test "index invariant holds after delete_edge" do
     check all(
             g <- multigraph(min_edges: 2),
             max_runs: 500
           ) do
-      edge = Enum.random(Graph.edges(g))
-      g2 = Graph.delete_edge(g, edge.v1, edge.v2, edge.label)
+      edge = Enum.random(Multigraph.edges(g))
+      g2 = Multigraph.delete_edge(g, edge.v1, edge.v2, edge.label)
 
       assert_index_complete(g2)
       assert_index_sound(g2)
     end
   end
 
-  property "index invariant holds after delete_vertex" do
+  test "index invariant holds after delete_vertex" do
     check all(
             g <- multigraph(min_vertices: 2),
             max_runs: 500
           ) do
-      vertex = Enum.random(Graph.vertices(g))
-      g2 = Graph.delete_vertex(g, vertex)
+      vertex = Enum.random(Multigraph.vertices(g))
+      g2 = Multigraph.delete_vertex(g, vertex)
 
       assert_index_complete(g2)
       assert_index_sound(g2)
     end
   end
 
-  property "index invariant holds after update_labelled_edge with new label" do
+  test "index invariant holds after update_labelled_edge with new label" do
     check all(
             g <- multigraph(min_edges: 1),
             max_runs: 500
           ) do
-      edge = Enum.random(Graph.edges(g))
+      edge = Enum.random(Multigraph.edges(g))
       new_label = :updated_label
 
-      case Graph.update_labelled_edge(g, edge.v1, edge.v2, edge.label, label: new_label) do
+      case Multigraph.update_labelled_edge(g, edge.v1, edge.v2, edge.label, label: new_label) do
         {:error, _} ->
           :ok
 
@@ -103,23 +103,23 @@ defmodule Graph.Multigraph.Model.Test do
     end
   end
 
-  property "index invariant holds after transpose" do
+  test "index invariant holds after transpose" do
     check all(g <- multigraph(), max_runs: 500) do
-      gt = Graph.transpose(g)
+      gt = Multigraph.transpose(g)
 
       assert_index_complete(gt)
       assert_index_sound(gt)
     end
   end
 
-  property "subgraph preserves multigraph and index correctness" do
+  test "subgraph preserves multigraph and index correctness" do
     check all(
             g <- multigraph(min_vertices: 2),
             max_runs: 500
           ) do
-      vs = Graph.vertices(g)
+      vs = Multigraph.vertices(g)
       subset = Enum.take_random(vs, max(1, div(length(vs), 2)))
-      sg = Graph.subgraph(g, subset)
+      sg = Multigraph.subgraph(g, subset)
 
       assert sg.multigraph == true
       assert_index_complete(sg)
@@ -127,7 +127,7 @@ defmodule Graph.Multigraph.Model.Test do
     end
   end
 
-  property "adding the same edge twice does not create duplicate index entries" do
+  test "adding the same edge twice does not create duplicate index entries" do
     check all(g <- multigraph(), max_runs: 500) do
       for {_partition, vertex_map} <- g.edge_index,
           {_v_id, edge_keys} <- vertex_map do
@@ -137,25 +137,25 @@ defmodule Graph.Multigraph.Model.Test do
     end
   end
 
-  property "non-multigraph queries are equivalent to multigraph queries" do
+  test "non-multigraph queries are equivalent to multigraph queries" do
     check all(g <- multigraph(), max_runs: 500) do
       plain =
         g
-        |> Graph.edges()
-        |> Enum.reduce(Graph.new(), fn edge, acc ->
-          Graph.add_edge(acc, edge.v1, edge.v2,
+        |> Multigraph.edges()
+        |> Enum.reduce(Multigraph.new(), fn edge, acc ->
+          Multigraph.add_edge(acc, edge.v1, edge.v2,
             label: edge.label,
             weight: edge.weight,
             properties: edge.properties
           )
         end)
 
-      assert MapSet.new(Graph.edges(g)) == MapSet.new(Graph.edges(plain))
-      assert MapSet.new(Graph.vertices(g)) == MapSet.new(Graph.vertices(plain))
+      assert MapSet.new(Multigraph.edges(g)) == MapSet.new(Multigraph.edges(plain))
+      assert MapSet.new(Multigraph.vertices(g)) == MapSet.new(Multigraph.vertices(plain))
     end
   end
 
-  property "index invariant holds after a sequence of mutations" do
+  test "index invariant holds after a sequence of mutations" do
     check all(
             g <- multigraph(min_vertices: 3, min_edges: 3),
             mutations <- list_of(mutation_gen(), min_length: 1, max_length: 10),
@@ -171,14 +171,14 @@ defmodule Graph.Multigraph.Model.Test do
     end
   end
 
-  property "index invariant holds after split_edge" do
+  test "index invariant holds after split_edge" do
     check all(
             g <- multigraph(min_edges: 1),
             max_runs: 500
           ) do
-      edge = Enum.random(Graph.edges(g))
+      edge = Enum.random(Multigraph.edges(g))
       mid = {:split_mid, :rand.uniform(10_000)}
-      g2 = Graph.split_edge(g, edge.v1, edge.v2, mid)
+      g2 = Multigraph.split_edge(g, edge.v1, edge.v2, mid)
 
       assert_index_complete(g2)
       assert_index_sound(g2)
@@ -195,37 +195,37 @@ defmodule Graph.Multigraph.Model.Test do
     end
   end
 
-  property "BFS with partition filter visits subset of unfiltered BFS" do
+  test "BFS with partition filter visits subset of unfiltered BFS" do
     check all(g <- multigraph(min_edges: 2), max_runs: 500) do
-      all_visited = MapSet.new(Graph.Reducers.Bfs.map(g, fn v -> v end))
+      all_visited = MapSet.new(Multigraph.Reducers.Bfs.map(g, fn v -> v end))
 
       for label <- @labels do
-        filtered = MapSet.new(Graph.Reducers.Bfs.map(g, fn v -> v end, by: label))
+        filtered = MapSet.new(Multigraph.Reducers.Bfs.map(g, fn v -> v end, by: label))
         assert MapSet.subset?(filtered, all_visited)
       end
     end
   end
 
-  property "DFS with partition filter visits subset of unfiltered vertices" do
+  test "DFS with partition filter visits subset of unfiltered vertices" do
     check all(g <- multigraph(min_edges: 2), max_runs: 500) do
-      all_vertices = MapSet.new(Graph.vertices(g))
+      all_vertices = MapSet.new(Multigraph.vertices(g))
 
       for label <- @labels do
-        filtered = MapSet.new(Graph.Reducers.Dfs.map(g, fn v -> v end, by: label))
+        filtered = MapSet.new(Multigraph.Reducers.Dfs.map(g, fn v -> v end, by: label))
         assert MapSet.subset?(filtered, all_vertices)
       end
     end
   end
 
-  property "Dijkstra with partition filter returns path using only filtered edges" do
+  test "Dijkstra with partition filter returns path using only filtered edges" do
     check all(g <- multigraph(min_edges: 2), max_runs: 300) do
-      vertices = Graph.vertices(g)
+      vertices = Multigraph.vertices(g)
 
       if length(vertices) >= 2 do
         [a, b] = Enum.take_random(vertices, 2)
 
         for label <- @labels do
-          case Graph.dijkstra(g, a, b, by: label) do
+          case Multigraph.dijkstra(g, a, b, by: label) do
             nil ->
               :ok
 
@@ -238,7 +238,7 @@ defmodule Graph.Multigraph.Model.Test do
               |> Enum.chunk_every(2, 1, :discard)
               |> Enum.each(fn [v1, v2] ->
                 matching =
-                  Graph.edges(g)
+                  Multigraph.edges(g)
                   |> Enum.any?(fn edge ->
                     edge.v1 == v1 and edge.v2 == v2 and label in g.partition_by.(edge)
                   end)
@@ -255,7 +255,7 @@ defmodule Graph.Multigraph.Model.Test do
   ## Helpers
 
   defp assert_index_complete(g) do
-    for edge <- Graph.edges(g) do
+    for edge <- Multigraph.edges(g) do
       partitions = g.partition_by.(edge)
       v1_id = g.vertex_identifier.(edge.v1)
       v2_id = g.vertex_identifier.(edge.v2)
@@ -291,8 +291,8 @@ defmodule Graph.Multigraph.Model.Test do
           num_edges <- integer(max(min_edges, 1)..20),
           edges <- list_of(edge_gen(num_vertices), length: num_edges)
         ) do
-      Enum.reduce(edges, Graph.new(multigraph: true), fn {v1, v2, opts}, g ->
-        Graph.add_edge(g, v1, v2, opts)
+      Enum.reduce(edges, Multigraph.new(multigraph: true), fn {v1, v2, opts}, g ->
+        Multigraph.add_edge(g, v1, v2, opts)
       end)
     end
   end
@@ -323,19 +323,19 @@ defmodule Graph.Multigraph.Model.Test do
   end
 
   defp apply_mutation(g, {:add_edge, v1, v2, label, weight}) do
-    Graph.add_edge(g, v1, v2, label: label, weight: weight)
+    Multigraph.add_edge(g, v1, v2, label: label, weight: weight)
   end
 
   defp apply_mutation(g, {:delete_edge, v1, v2, label}) do
-    Graph.delete_edge(g, v1, v2, label)
+    Multigraph.delete_edge(g, v1, v2, label)
   end
 
   defp apply_mutation(g, {:delete_vertex, v}) do
-    if Graph.has_vertex?(g, v), do: Graph.delete_vertex(g, v), else: g
+    if Multigraph.has_vertex?(g, v), do: Multigraph.delete_vertex(g, v), else: g
   end
 
   defp apply_mutation(g, {:update_labelled_edge, v1, v2, old_label, new_label}) do
-    case Graph.update_labelled_edge(g, v1, v2, old_label, label: new_label) do
+    case Multigraph.update_labelled_edge(g, v1, v2, old_label, label: new_label) do
       {:error, _} -> g
       g2 -> g2
     end

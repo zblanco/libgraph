@@ -1,9 +1,9 @@
-defimpl Inspect, for: Graph do
+defimpl Inspect, for: Multigraph do
   # For graphs with less than 100 vertices, we'll try to pretty print it,
   # however we should avoid doing so with larger graphs, as it will likely cause outrageous
   # memory consumption, not to mention be expensive to calculate, and the pretty form is not
   # very useful at that size anyway
-  def inspect(%Graph{type: type, vertices: vs, out_edges: es, edges: meta}, opts)
+  def inspect(%Multigraph{type: type, vertices: vs, out_edges: es, edges: meta}, opts)
       when map_size(vs) < 100 do
     # The goal here is to strip out the ids map, convert the vertices map to a list of vertices
     # and convert the map of edges to their reified forms (i.e. the actual vertex term is used in place of ids)
@@ -14,7 +14,7 @@ defimpl Inspect, for: Graph do
     doc =
       Inspect.Algebra.concat([
         Inspect.Algebra.empty(),
-        "#Graph<type: #{type}, vertices:",
+        "#Multigraph<type: #{type}, vertices:",
         " ",
         vs_doc,
         ",",
@@ -66,9 +66,9 @@ defimpl Inspect, for: Graph do
   end
 
   # For large graphs, just print summary information about the graph
-  def inspect(%Graph{type: type} = g, _opts) do
-    num_vertices = Graph.num_vertices(g)
-    num_edges = Graph.num_edges(g)
-    "#Graph<type: #{type}, num_vertices: #{num_vertices}, num_edges: #{num_edges}>"
+  def inspect(%Multigraph{type: type} = g, _opts) do
+    num_vertices = Multigraph.num_vertices(g)
+    num_edges = Multigraph.num_edges(g)
+    "#Multigraph<type: #{type}, num_vertices: #{num_vertices}, num_edges: #{num_edges}>"
   end
 end

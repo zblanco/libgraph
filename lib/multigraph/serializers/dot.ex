@@ -1,18 +1,18 @@
-defmodule Graph.Serializers.DOT do
+defmodule Multigraph.Serializers.DOT do
   @moduledoc """
-  This serializer converts a Graph to a DOT file, which can then be converted
+  This serializer converts a Multigraph to a DOT file, which can then be converted
   to a great many other formats using Graphviz, e.g. `dot -Tpng out.dot > out.png`.
   """
-  use Graph.Serializer
-  alias Graph.Serializer
+  use Multigraph.Serializer
+  alias Multigraph.Serializer
 
-  def serialize(%Graph{type: type} = g) do
+  def serialize(%Multigraph{type: type} = g) do
     type = if type == :directed, do: "digraph", else: "graph"
     result = "strict #{type} {\n" <> serialize_nodes(g) <> serialize_edges(g) <> "}\n"
     {:ok, result}
   end
 
-  defp serialize_nodes(%Graph{vertices: vertices} = g) do
+  defp serialize_nodes(%Multigraph{vertices: vertices} = g) do
     Enum.reduce(vertices, "", fn {id, v}, acc ->
       acc <>
         Serializer.indent(1) <>
@@ -20,7 +20,7 @@ defmodule Graph.Serializers.DOT do
     end)
   end
 
-  defp serialize_edges(%Graph{type: type, vertices: vertices, out_edges: oe, edges: em} = _g) do
+  defp serialize_edges(%Multigraph{type: type, vertices: vertices, out_edges: oe, edges: em} = _g) do
     edges =
       Enum.reduce(vertices, [], fn {id, _v}, acc ->
         edges =

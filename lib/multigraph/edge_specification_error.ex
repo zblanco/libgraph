@@ -1,6 +1,6 @@
-defmodule Graph.EdgeSpecificationError do
+defmodule Multigraph.EdgeSpecificationError do
   @moduledoc """
-  This exception is raised when a Graph function expects one or more valid edge specifications,
+  This exception is raised when a Multigraph function expects one or more valid edge specifications,
   but receives a term which does not match one of the allowed specification patterns.
   """
   defexception [:message]

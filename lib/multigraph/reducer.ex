@@ -1,4 +1,4 @@
-defmodule Graph.Reducer do
+defmodule Multigraph.Reducer do
   @moduledoc """
   Reducers provide a way to traverse a graph while applying a function at each vertex. This
   can be used for a variety of things, most notably though is pre-processing a graph, for example
@@ -11,18 +11,22 @@ defmodule Graph.Reducer do
   so if you need to map over the graph but stop early, you'll want to build your own `map` implementation
   on top of `reduce`.
 
-  Provided out of the box are two reducers, `Graph.Reducers.Bfs` (for breadth-first traversals), and
-  `Graph.Reducers.Dfs` (for depth-first traversals). Simply choose the best one for your use case.
+  Provided out of the box are two reducers, `Multigraph.Reducers.Bfs` (for breadth-first traversals), and
+  `Multigraph.Reducers.Dfs` (for depth-first traversals). Simply choose the best one for your use case.
   """
 
-  @callback map(g :: Graph.t(), mapper :: (Graph.vertex() -> term)) :: term
-  @callback reduce(g :: Graph.t(), acc :: term, reducer :: (Graph.vertex(), term -> term)) ::
+  @callback map(g :: Multigraph.t(), mapper :: (Multigraph.vertex() -> term)) :: term
+  @callback reduce(
+              g :: Multigraph.t(),
+              acc :: term,
+              reducer :: (Multigraph.vertex(), term -> term)
+            ) ::
               {:next, term}
               | {:halt, term}
 
   defmacro __using__(_) do
     quote do
-      @behaviour Graph.Reducer
+      @behaviour Multigraph.Reducer
     end
   end
 end

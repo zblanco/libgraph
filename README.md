@@ -4,19 +4,19 @@
 [![Hex.pm Version](http://img.shields.io/hexpm/v/libgraph.svg?style=flat)](https://hex.pm/packages/libgraph)
 [![Coverage Status](https://coveralls.io/repos/github/bitwalker/libgraph/badge.svg?branch=master)](https://coveralls.io/github/bitwalker/libgraph?branch=master)
 
-[Documentation](https://hexdocs.pm/multigraph/Graph.html)
+[Documentation](https://hexdocs.pm/multigraph/Multigraph.html)
 
 ## About
 
 This library provides:
 
-- An implementation of a graph datastructure, `Graph`, designed for both directed and undirected graphs. The API supports
+- An implementation of a graph datastructure, `Multigraph`, designed for both directed and undirected graphs. The API supports
   undirected graphs, but I'm still getting the tests updated to cover properties of undirected graphs.
-- A priority queue implementation `PriorityQueue`, oriented towards graphs (it prioritizes lower integer values over high),
+- A priority queue implementation `Multigraph.PriorityQueue`, oriented towards graphs (it prioritizes lower integer values over high),
   it is the fastest priority queue I know of which allows arbitrary priorities, and is more or less at parity with
   `pqueue3` from [the pqueue library](https://github.com/okeuday/pqueue/), which supports priorities from 0 to 65535.
 - An idiomatic Elixir API for creating, modifying, and querying its graph structure. Creating and modifying a graph
-  can be done in a single pipeline, and all queries take a Graph as their first parameter (one of my complaints with `:digraph`
+  can be done in a single pipeline, and all queries take a Multigraph as their first parameter (one of my complaints with `:digraph`
   is that there is some inconsistency with the API between `:digraph` and `:digraph_utils` for no apparent reason).
 - Two "Reducer" implementations for mapping/reducing over a graph. I am trying to figure out the best way to make these
 extendable and part of the API, so that you can drop in your own shortest path algorithms, etc - but I have yet to come up with an
@@ -55,8 +55,8 @@ that allows O(1) lookup of edges by partition key, avoiding full edge scans.
 
 ```elixir
 g =
-  Graph.new(multigraph: true)
-  |> Graph.add_edges([
+  Multigraph.new(multigraph: true)
+  |> Multigraph.add_edges([
     {:a, :b, label: :uses},
     {:a, :b, label: :contains},
     {:b, :c, label: :uses},
@@ -66,21 +66,21 @@ g =
 
 ### Querying by partition
 
-By default, edges are partitioned by their label (via `Graph.Utils.by_edge_label/1`). You can
+By default, edges are partitioned by their label (via `Multigraph.Utils.by_edge_label/1`). You can
 query edges belonging to a specific partition:
 
 ```elixir
 # Get only :uses edges
-Graph.edges(g, by: :uses)
-#=> [%Graph.Edge{v1: :a, v2: :b, label: :uses}, %Graph.Edge{v1: :b, v2: :c, label: :uses}]
+Multigraph.edges(g, by: :uses)
+#=> [%Multigraph.Edge{v1: :a, v2: :b, label: :uses}, %Multigraph.Edge{v1: :b, v2: :c, label: :uses}]
 
 # Get out edges from :a with label :contains
-Graph.out_edges(g, :a, by: :contains)
-#=> [%Graph.Edge{v1: :a, v2: :b, label: :contains}]
+Multigraph.out_edges(g, :a, by: :contains)
+#=> [%Multigraph.Edge{v1: :a, v2: :b, label: :contains}]
 
 # Filter edges with a predicate
-Graph.edges(g, where: fn edge -> edge.weight > 2 end)
-#=> [%Graph.Edge{v1: :b, v2: :c, label: :owns, weight: 3}]
+Multigraph.edges(g, where: fn edge -> edge.weight > 2 end)
+#=> [%Multigraph.Edge{v1: :b, v2: :c, label: :owns, weight: 3}]
 ```
 
 ### Custom partition functions
@@ -88,11 +88,11 @@ Graph.edges(g, where: fn edge -> edge.weight > 2 end)
 You can provide a custom `partition_by` function to control how edges are indexed:
 
 ```elixir
-g = Graph.new(multigraph: true, partition_by: fn edge -> [edge.weight] end)
-|> Graph.add_edges([{:a, :b, weight: 1}, {:b, :c, weight: 2}])
+g = Multigraph.new(multigraph: true, partition_by: fn edge -> [edge.weight] end)
+|> Multigraph.add_edges([{:a, :b, weight: 1}, {:b, :c, weight: 2}])
 
-Graph.edges(g, by: 1)
-#=> [%Graph.Edge{v1: :a, v2: :b, weight: 1}]
+Multigraph.edges(g, by: 1)
+#=> [%Multigraph.Edge{v1: :a, v2: :b, weight: 1}]
 ```
 
 ### Partition-filtered traversals
@@ -102,8 +102,8 @@ edges in specific partitions:
 
 ```elixir
 g =
-  Graph.new(multigraph: true)
-  |> Graph.add_edges([
+  Multigraph.new(multigraph: true)
+  |> Multigraph.add_edges([
     {:a, :b, label: :fast, weight: 1},
     {:a, :c, label: :slow, weight: 10},
     {:b, :d, label: :fast, weight: 1},
@@ -111,11 +111,11 @@ g =
   ])
 
 # Shortest path using only :fast edges
-Graph.dijkstra(g, :a, :d, by: :fast)
+Multigraph.dijkstra(g, :a, :d, by: :fast)
 #=> [:a, :b, :d]
 
 # BFS following only :fast edges
-Graph.Reducers.Bfs.map(g, & &1, by: :fast)
+Multigraph.Reducers.Bfs.map(g, & &1, by: :fast)
 #=> [:a, :b, :d]
 ```
 
@@ -124,10 +124,10 @@ Graph.Reducers.Bfs.map(g, & &1, by: :fast)
 Edges now support an arbitrary `properties` map for storing additional metadata:
 
 ```elixir
-g = Graph.new()
-|> Graph.add_edge(:a, :b, label: :link, properties: %{color: "red", style: :dashed})
+g = Multigraph.new()
+|> Multigraph.add_edge(:a, :b, label: :link, properties: %{color: "red", style: :dashed})
 
-[edge] = Graph.edges(g)
+[edge] = Multigraph.edges(g)
 edge.properties
 #=> %{color: "red", style: :dashed}
 ```
@@ -178,8 +178,8 @@ I would encourage you to use them as a template to construct a benchmark based o
 that way, as it will give you a better basis to make your decision on. However, if you do find that `libgraph` is behind
 `:digraph` with a benchmark, please let me know so that I can improve the library!
 
-NOTE: While this library is primarily focused on the `Graph` data structure it defines, it also contains an implementation
-of a priority queue (you can find it under the `PriorityQueue` module), designed for use with graphs specifically, as it
+NOTE: While this library is primarily focused on the `Multigraph` data structure it defines, it also contains an implementation
+of a priority queue (you can find it under the `Multigraph.PriorityQueue` module), designed for use with graphs specifically, as it
 considers lower integer values higher priority, which is perfect for the kinds of graph algorithms you need a priority queue for.
 
 ## Contributing

@@ -1,4 +1,4 @@
-defmodule Graph.Pathfindings.BellmanFord do
+defmodule Multigraph.Pathfindings.BellmanFord do
   @moduledoc """
   The Bellman–Ford algorithm is an algorithm that computes shortest paths from a single
   source vertex to all of the other vertices in a weighted digraph.
@@ -6,15 +6,16 @@ defmodule Graph.Pathfindings.BellmanFord do
   Time complexity: O(VLogV)
   """
 
-  @typep distance() :: %{Graph.vertex_id() => integer()}
+  @typep distance() :: %{Multigraph.vertex_id() => integer()}
 
   @doc """
   Returns nil when graph has negative cycle.
   """
-  @spec call(Graph.t(), Graph.vertex()) :: %{Graph.vertex() => integer() | :infinity} | nil
-  def call(%Graph{} = g, a), do: do_call(g, a, nil)
+  @spec call(Multigraph.t(), Multigraph.vertex()) ::
+          %{Multigraph.vertex() => integer() | :infinity} | nil
+  def call(%Multigraph{} = g, a), do: do_call(g, a, nil)
 
-  def call(%Graph{} = g, a, opts) when is_list(opts) do
+  def call(%Multigraph{} = g, a, opts) when is_list(opts) do
     partitions = partitions_from_opts(opts)
     do_call(g, a, partitions)
   end
@@ -27,8 +28,8 @@ defmodule Graph.Pathfindings.BellmanFord do
     end
   end
 
-  defp do_call(%Graph{vertices: vs, edges: meta} = g, a, partitions) do
-    distances = a |> Graph.Utils.vertex_id() |> init_distances(vs)
+  defp do_call(%Multigraph{vertices: vs, edges: meta} = g, a, partitions) do
+    distances = a |> Multigraph.Utils.vertex_id() |> init_distances(vs)
 
     weights = edges_with_weights(meta, g, partitions)
 
@@ -52,7 +53,7 @@ defmodule Graph.Pathfindings.BellmanFord do
 
   defp edges_with_weights(
          meta,
-         %Graph{partition_by: partition_by, edge_properties: ep},
+         %Multigraph{partition_by: partition_by, edge_properties: ep},
          partitions
        ) do
     Enum.flat_map(meta, fn {edge_key, edge_value} ->
@@ -73,7 +74,7 @@ defmodule Graph.Pathfindings.BellmanFord do
     end)
   end
 
-  @spec init_distances(Graph.vertex(), Graph.vertices()) :: distance
+  @spec init_distances(Multigraph.vertex(), Multigraph.vertices()) :: distance
   defp init_distances(vertex_id, vertices) do
     Map.new(vertices, fn
       {id, _vertex} when id == vertex_id -> {id, 0}

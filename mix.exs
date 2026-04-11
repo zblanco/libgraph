@@ -1,4 +1,4 @@
-defmodule Graph.Mixfile do
+defmodule Multigraph.MixProject do
   use Mix.Project
 
   def project do

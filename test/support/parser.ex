@@ -1,4 +1,4 @@
-defmodule Graph.Test.Fixtures.Parser do
+defmodule Multigraph.Test.Fixtures.Parser do
   @moduledoc false
 
   @doc """
@@ -6,10 +6,10 @@ defmodule Graph.Test.Fixtures.Parser do
   graphs as lines of tab-separated points representing the edges.
   Each edge is on it's own line. There may be comments which lead with `#`.
   """
-  @spec parse(String.t()) :: Graph.t()
-  @spec parse(String.t(), :directed | :undirected) :: Graph.t()
+  @spec parse(String.t()) :: Multigraph.t()
+  @spec parse(String.t(), :directed | :undirected) :: Multigraph.t()
   def parse(path, type \\ :undirected) do
-    g = Graph.new(type: type)
+    g = Multigraph.new(type: type)
 
     points =
       path
@@ -21,6 +21,6 @@ defmodule Graph.Test.Fixtures.Parser do
       |> Stream.map(fn line -> String.split(line, ~r/[\t\s\n]/, trim: true) end)
       |> Stream.map(fn [a, b] -> {String.to_integer(a), String.to_integer(b)} end)
 
-    Graph.add_edges(g, points)
+    Multigraph.add_edges(g, points)
   end
 end
