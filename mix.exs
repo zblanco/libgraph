@@ -4,7 +4,7 @@ defmodule Multigraph.MixProject do
   def project do
     [
       app: :multigraph,
-      version: "0.16.1-mg.2",
+      version: "0.16.1-mg.3",
       elixir: "~> 1.14",
       build_embedded: Mix.env() == :prod,
       start_permanent: Mix.env() == :prod,
