@@ -1190,7 +1190,7 @@ defmodule Multigraph do
 
     with v_id <- vertex_identifier.(v),
          true <- Map.has_key?(vs, v_id) do
-      g = prune_vertex_from_edge_index(g, v_id, v)
+      g = %__MODULE__{} = prune_vertex_from_edge_index(g, v_id, v)
 
       oe = Map.delete(g.out_edges, v_id)
       ie = Map.delete(g.in_edges, v_id)
@@ -1311,7 +1311,7 @@ defmodule Multigraph do
         Map.put(ep, edge_key, Map.put(key_props, label, properties))
       end
 
-    g =
+    g = %__MODULE__{} =
       if g.multigraph do
         edge = Edge.new(v1, v2, label: label, weight: weight, properties: properties)
         index_multigraph_edge(g, edge_key, edge)
@@ -1335,7 +1335,7 @@ defmodule Multigraph do
        ) do
     partitions = graph.partition_by.(edge)
 
-    Enum.reduce(partitions, graph, fn partition, g ->
+    Enum.reduce(partitions, graph, fn partition, %__MODULE__{} = g ->
       edge_partition = Map.get(g.edge_index, partition, %{})
 
       v1_set = Map.get(edge_partition, v1_id, MapSet.new())
@@ -1452,7 +1452,7 @@ defmodule Multigraph do
          meta <- Map.get(em, {v1_id, v2_id}),
          v1_out <- MapSet.delete(v1_out, v2_id),
          v2_in <- MapSet.delete(v2_in, v1_id) do
-      g = prune_all_edge_indexes(g, {v1_id, v1}, {v2_id, v2})
+      g = %__MODULE__{} = prune_all_edge_indexes(g, {v1_id, v1}, {v2_id, v2})
 
       g = %__MODULE__{
         g
@@ -1581,7 +1581,7 @@ defmodule Multigraph do
             end
 
           if g.multigraph do
-            g =
+            g = %__MODULE__{} =
               g
               |> prune_edge_index({v1_id, v1}, {v2_id, v2}, old_label)
               |> index_multigraph_edge(
@@ -1651,7 +1651,7 @@ defmodule Multigraph do
          edge_key <- {v1_id, v2_id},
          {:ok, v1_out} <- Map.fetch(oe, v1_id),
          {:ok, v2_in} <- Map.fetch(ie, v2_id) do
-      g = prune_all_edge_indexes(g, {v1_id, v1}, {v2_id, v2})
+      g = %__MODULE__{} = prune_all_edge_indexes(g, {v1_id, v1}, {v2_id, v2})
       v1_out = MapSet.delete(v1_out, v2_id)
       v2_in = MapSet.delete(v2_in, v1_id)
       meta = Map.delete(meta, edge_key)
@@ -1723,7 +1723,7 @@ defmodule Multigraph do
   end
 
   defp prune_edge_key_from_partitions(g, edge_key, v1_id, v2_id, partitions) do
-    Enum.reduce(partitions, g, fn edge_p, acc ->
+    Enum.reduce(partitions, g, fn edge_p, %__MODULE__{} = acc ->
       partition =
         acc.edge_index
         |> Map.get(edge_p, %{})
@@ -1835,7 +1835,7 @@ defmodule Multigraph do
          {:ok, v2_in} <- Map.fetch(ie, v2_id),
          {:ok, edge_meta} <- Map.fetch(meta, edge_key),
          {:ok, _} <- Map.fetch(edge_meta, label) do
-      g = prune_edge_index(g, {v1_id, v1}, {v2_id, v2}, label)
+      g = %__MODULE__{} = prune_edge_index(g, {v1_id, v1}, {v2_id, v2}, label)
       edge_meta = Map.delete(edge_meta, label)
 
       case map_size(edge_meta) do
