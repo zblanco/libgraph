@@ -14,8 +14,13 @@ defmodule Multigraph.MixProject do
         "A high-performance graph datastructure library for Elixir projects with multigraph support",
       package: package(),
       test_coverage: [tool: ExCoveralls],
-      aliases: aliases(),
-      preferred_cli_env: [
+      aliases: aliases()
+    ]
+  end
+
+  def cli do
+    [
+      preferred_envs: [
         coveralls: :test,
         "coveralls.html": :test,
         "coveralls.json": :test,

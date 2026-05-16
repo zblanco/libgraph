@@ -1311,7 +1311,8 @@ defmodule Multigraph do
         Map.put(ep, edge_key, Map.put(key_props, label, properties))
       end
 
-    g = %__MODULE__{} =
+    g =
+      %__MODULE__{} =
       if g.multigraph do
         edge = Edge.new(v1, v2, label: label, weight: weight, properties: properties)
         index_multigraph_edge(g, edge_key, edge)
@@ -1581,7 +1582,8 @@ defmodule Multigraph do
             end
 
           if g.multigraph do
-            g = %__MODULE__{} =
+            g =
+              %__MODULE__{} =
               g
               |> prune_edge_index({v1_id, v1}, {v2_id, v2}, old_label)
               |> index_multigraph_edge(
