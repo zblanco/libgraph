@@ -779,8 +779,8 @@ defmodule MultigraphTest do
         {:d, :f}
       ])
 
-    cliques = Multigraph.cliques(g)
-    assert [[:a, :b, :e], [:b, :c], [:c, :d], [:d, :e], [:d, :f]] = cliques
+    cliques = Multigraph.cliques(g) |> Enum.map(&Enum.sort/1) |> Enum.sort()
+    assert cliques == [[:a, :b, :e], [:b, :c], [:c, :d], [:d, :e], [:d, :f]]
   end
 
   test "k_cliques/2" do
@@ -909,10 +909,10 @@ defmodule MultigraphTest do
       ])
 
     components = Multigraph.k_core_components(g)
-    assert [:i] = components[0]
-    assert [:e, :f, :g, :h] = components[1]
+    assert Enum.sort(components[0]) == [:i]
+    assert Enum.sort(components[1]) == [:e, :f, :g, :h]
     assert is_nil(components[2])
-    assert [:a, :b, :c, :d] = components[3]
+    assert Enum.sort(components[3]) == [:a, :b, :c, :d]
   end
 
   test "coreness/2" do
